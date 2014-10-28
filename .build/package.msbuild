@@ -4,7 +4,7 @@
 		<ShuttleCoreMSBuildVersion>1.0.5</ShuttleCoreMSBuildVersion>
 		<ShuttleCoreMSBuildFrameworkVersion>net35-full</ShuttleCoreMSBuildFrameworkVersion>
 		<NuGetExecutablePath>..\.nuget\nuget.exe</NuGetExecutablePath>
-		<PackageName>shuttle-esb-tests</PackageName>
+		<PackageName>shuttle-esb-rabbitmq</PackageName>
 	</PropertyGroup>
 
 	<UsingTask AssemblyFile="..\packages\shuttle-core-msbuild.$(ShuttleCoreMSBuildVersion)\tools\$(ShuttleCoreMSBuildFrameworkVersion)\Shuttle.Core.MSBuild.dll" TaskName="Shuttle.Core.MSBuild.Prompt" />
@@ -13,7 +13,7 @@
 
 	<ItemGroup>
 		<Framework Include="net35-full;net40-full;net45-full;net451-full" />
-		<ProjectReference Include="..\Shuttle.ESB.Tests\Shuttle.ESB.Tests.csproj" />
+		<ProjectReference Include="..\Shuttle.ESB.RabbitMQ\Shuttle.ESB.RabbitMQ.csproj" />
 	</ItemGroup>
 
 	<Target Name="Build">
@@ -44,7 +44,7 @@
         />
 
 		<ItemGroup>
-			<NugetBinaries Include="$(DeploymentFolder)\release\**\Shuttle.ESB.Tests.dll" />
+			<NugetBinaries Include="$(DeploymentFolder)\release\**\Shuttle.ESB.RabbitMQ.dll" />
 		</ItemGroup>
 
 		<Copy SourceFiles="$(PackageName).nuspec" DestinationFolder="$(DeploymentFolder)\nuget\$(PackageName)" SkipUnchangedFiles="false" />
