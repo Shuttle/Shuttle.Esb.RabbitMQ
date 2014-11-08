@@ -9,13 +9,15 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{B264C7
 	ProjectSection(SolutionItems) = preProject
 		.nuget\NuGet.Config = .nuget\NuGet.Config
 		.nuget\NuGet.exe = .nuget\NuGet.exe
-		.nuget\NuGet.targets = .nuget\NuGet.targets
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".build", ".build", "{F470D1C2-437A-43BB-88C2-3A79ED14C56D}"
 	ProjectSection(SolutionItems) = preProject
 		.build\package.msbuild = .build\package.msbuild
+		.build\package.nuspec = .build\package.nuspec
 		.build\shuttle-esb-rabbitmq.nuspec = .build\shuttle-esb-rabbitmq.nuspec
+		.build\Shuttle.Core.MSBuild.dll = .build\Shuttle.Core.MSBuild.dll
+		.build\Shuttle.Core.MSBuild.targets = .build\Shuttle.Core.MSBuild.targets
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{E3DA33DD-23F9-4FE6-A8FF-C28DE0B3E0BC}"
