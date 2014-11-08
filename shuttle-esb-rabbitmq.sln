@@ -15,7 +15,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".build", ".build", "{F470D1
 	ProjectSection(SolutionItems) = preProject
 		.build\package.msbuild = .build\package.msbuild
 		.build\package.nuspec = .build\package.nuspec
-		.build\shuttle-esb-rabbitmq.nuspec = .build\shuttle-esb-rabbitmq.nuspec
 		.build\Shuttle.Core.MSBuild.dll = .build\Shuttle.Core.MSBuild.dll
 		.build\Shuttle.Core.MSBuild.targets = .build\Shuttle.Core.MSBuild.targets
 	EndProjectSection
