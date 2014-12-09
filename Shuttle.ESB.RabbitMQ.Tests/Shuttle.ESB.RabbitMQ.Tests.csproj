@@ -50,13 +50,13 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\shuttle-core-infrastructure-log4net.3.1.5\lib\net35-full\Shuttle.Core.Infrastructure.Log4Net.dll</HintPath>
     </Reference>
-    <Reference Include="Shuttle.ESB.Core, Version=3.3.9.0, Culture=neutral, processorArchitecture=MSIL">
+    <Reference Include="Shuttle.ESB.Core, Version=3.4.1.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\shuttle-esb-core.3.3.9\lib\net35-full\Shuttle.ESB.Core.dll</HintPath>
+      <HintPath>..\packages\shuttle-esb-core.3.4.1\lib\net35-full\Shuttle.ESB.Core.dll</HintPath>
     </Reference>
-    <Reference Include="Shuttle.ESB.Tests, Version=3.3.9.0, Culture=neutral, processorArchitecture=MSIL">
+    <Reference Include="Shuttle.ESB.Tests, Version=3.4.1.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\shuttle-esb-tests.3.3.9\lib\net35-full\Shuttle.ESB.Tests.dll</HintPath>
+      <HintPath>..\packages\shuttle-esb-tests.3.4.1\lib\net35-full\Shuttle.ESB.Tests.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />

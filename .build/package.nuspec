@@ -15,8 +15,8 @@
 		<tags>shuttle-esb rabbitmq</tags>
 		<dependencies>
 			<dependency id="RabbitMQ.Client" version="[{RabbitMQ.Client-version}]" />
-			<dependency id="shuttle-esb-core" version="[{shuttle-esb-core-version}]" />
-			<dependency id="shuttle-core-infrastructure" version="[{shuttle-core-infrastructure-version}]" />
+			<dependency id="shuttle-esb-core" version="{shuttle-esb-core-version}" />
+			<dependency id="shuttle-core-infrastructure" version="{shuttle-core-infrastructure-version}" />
 		</dependencies>
 	</metadata>
 </package>
