@@ -63,5 +63,23 @@ namespace Shuttle.ESB.RabbitMQ
 				return (ushort)this["defaultPrefetchCount"];
 			}
 		}
+
+		public static RabbitMQConfiguration Configuration()
+		{
+			var section = ShuttleConfigurationSection.Open<RabbitMQSection>("rabbitmq");
+			var configuration = new RabbitMQConfiguration();
+
+			if (section != null)
+			{
+				configuration.RequestedHeartbeat = section.RequestedHeartbeat;
+				configuration.LocalQueueTimeoutMilliseconds = section.LocalQueueTimeoutMilliseconds;
+				configuration.RemoteQueueTimeoutMilliseconds = section.RemoteQueueTimeoutMilliseconds;
+				configuration.ConnectionCloseTimeoutMilliseconds = section.ConnectionCloseTimeoutMilliseconds;
+				configuration.OperationRetryCount = section.OperationRetryCount;
+				configuration.DefaultPrefetchCount = section.DefaultPrefetchCount;
+			}
+
+			return configuration;
+		}
 	}
 }

@@ -9,7 +9,7 @@ namespace Shuttle.ESB.RabbitMQ
 		public IRabbitMQConfiguration Configuration { get; private set; }
 
 		public RabbitMQQueueFactory()
-			: this(RabbitMQConfiguration.Default())
+			: this(RabbitMQSection.Configuration())
 		{
 		}
 
