@@ -13,15 +13,16 @@ namespace Shuttle.ESB.RabbitMQ
 	{
 		private readonly IRabbitMQConfiguration _configuration;
 
-		private readonly object _connectionLock = new object();
-		private readonly object _queueLock = new object();
-		private readonly object _disposeLock = new object();
+		private static readonly object _connectionLock = new object();
+		private static readonly object _queueLock = new object();
+		private static readonly object _disposeLock = new object();
+
 		private readonly int _operationRetryCount;
 
 		private readonly RabbitMQUriParser _parser;
 
 		private readonly ConnectionFactory _factory;
-		private IConnection _connection;
+		private volatile IConnection _connection;
 
 		private readonly Dictionary<int, Channel> _channels = new Dictionary<int, Channel>();
 
@@ -50,7 +51,7 @@ namespace Shuttle.ESB.RabbitMQ
 					HostName = _parser.Host,
 					VirtualHost = _parser.VirtualHost,
 					Port = _parser.Port,
-					RequestedHeartbeat = configuration.RequestedHeartbeat
+					RequestedHeartbeat = (ushort)configuration.RequestedHeartbeat
 				};
 		}
 
@@ -118,29 +119,42 @@ namespace Shuttle.ESB.RabbitMQ
 
 		public void Create()
 		{
-			AccessQueue(() => { QueueDeclare(GetChannel().Model); });
+			AccessQueue(() => QueueDeclare(GetChannel().Model));
 		}
 
-		private QueueDeclareOk QueueDeclare(IModel model)
+		private void QueueDeclare(IModel model)
 		{
-			return model.QueueDeclare(_parser.Queue, true, false, false, null);
+			model.QueueDeclare(_parser.Queue, true, false, false, null);
 		}
 
 		private IConnection GetConnection()
 		{
-			if (_connection != null)
+			if (_connection != null && _connection.IsOpen)
 			{
 				return _connection;
 			}
 
 			lock (_connectionLock)
 			{
+				if (_connection != null && !_connection.IsOpen)
+				{
+					try
+					{
+						_connection.Dispose();
+					}
+					catch (Exception)
+					{
+					}
+
+					_connection = null;
+				}
+
 				if (_connection == null)
 				{
 					_connection = _factory.CreateConnection();
-
-					_connection.AutoClose = false;
 				}
+
+				_connection.AutoClose = false;
 			}
 
 			return _connection;
@@ -150,16 +164,20 @@ namespace Shuttle.ESB.RabbitMQ
 		{
 			var key = Thread.CurrentThread.ManagedThreadId;
 
-			if (_channels.ContainsKey(key))
+			var channel = FindChannel(key);
+
+			if (channel != null)
 			{
-				return _channels[key];
+				return channel;
 			}
 
 			lock (_queueLock)
 			{
-				if (_channels.ContainsKey(key))
+				channel = FindChannel(key);
+
+				if (channel != null)
 				{
-					return _channels[key];
+					return channel;
 				}
 
 				var retry = 0;
@@ -184,16 +202,42 @@ namespace Shuttle.ESB.RabbitMQ
 
 				var model = connection.CreateModel();
 
-				model.BasicQos(0, _parser.PrefetchCount == 0 ? _configuration.DefaultPrefetchCount : _parser.PrefetchCount, false);
+				model.BasicQos(0, (ushort)(_parser.PrefetchCount == 0 ? _configuration.DefaultPrefetchCount : _parser.PrefetchCount), false);
 
 				QueueDeclare(model);
 
-				var channel = new Channel(model, _parser, _configuration);
+				channel = new Channel(model, _parser, _configuration);
 
 				_channels.Add(key, channel);
 
 				return channel;
 			}
+		}
+
+		private Channel FindChannel(int key)
+		{
+			Channel channel = null;
+
+			if (_channels.ContainsKey(key))
+			{
+				channel = _channels[key];
+
+				if (!channel.Model.IsOpen)
+				{
+					try
+					{
+						channel.Dispose();
+					}
+					catch (Exception)
+					{
+					}
+
+					_channels.Remove(key);
+					channel = null;
+				}
+			}
+
+			return channel;
 		}
 
 		public void Dispose()
@@ -214,12 +258,8 @@ namespace Shuttle.ESB.RabbitMQ
 					{
 						_connection.Dispose();
 					}
-					catch (IOException)
+					catch (Exception)
 					{
-					}
-					catch (Exception ex)
-					{
-						var e = ex;
 					}
 
 					_connection = null;

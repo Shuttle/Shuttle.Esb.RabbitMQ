@@ -1,9 +1,6 @@
+using System;
 using System.Reflection;
 using System.Runtime.InteropServices;
-
-#if NET35FULL
-[assembly: AssemblyTitle("Shuttle.ESB.RabbitMQ for .NET Framework 3.5")]
-#endif
 
 #if NET40FULL
 [assembly: AssemblyTitle("Shuttle.ESB.RabbitMQ for .NET Framework 4.0")]
@@ -17,11 +14,15 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("Shuttle.ESB.RabbitMQ for .NET Framework 4.5.1")]
 #endif
 
-[assembly: AssemblyVersion("3.4.2.0")]
-[assembly: AssemblyCopyright("Copyright © Eben Roux 2010-2014")]
+#if NET452FULL
+[assembly: AssemblyTitle("Shuttle.ESB.RabbitMQ for .NET Framework 4.5.2")]
+#endif
+
+[assembly: AssemblyVersion("3.4.4.0")]
+[assembly: AssemblyCopyright("Copyright © Eben Roux 2010-2015")]
 [assembly: AssemblyProduct("Shuttle.ESB")]
 [assembly: AssemblyCompany("Shuttle")]
 [assembly: AssemblyConfiguration("Release")]
-[assembly: AssemblyInformationalVersion("3.4.2")]
+[assembly: AssemblyInformationalVersion("3.4.4")]
 [assembly: ComVisible(false)]
 

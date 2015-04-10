@@ -97,7 +97,7 @@ namespace Shuttle.ESB.RabbitMQ
 			}
 		}
 
-		public ushort PrefetchCount { get; private set; }
+		public int PrefetchCount { get; private set; }
 		public string Username { get; private set; }
 		public string Password { get; private set; }
 		public string Host { get; private set; }
