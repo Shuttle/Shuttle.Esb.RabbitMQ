@@ -244,7 +244,33 @@ namespace Shuttle.ESB.RabbitMQ
 		{
 			lock (_disposeLock)
 			{
-				_channels.Values.AttemptDispose();
+				foreach (var value in _channels.Values)
+				{
+					if (value.Model != null)
+					{
+						if (value.Model.IsOpen)
+						{
+							value.Model.Close();
+						}
+
+						try
+						{
+							value.Model.Dispose();
+						}
+						catch (Exception)
+						{
+						}
+					}
+
+					try
+					{
+						value.Dispose();
+					}
+					catch (Exception)
+					{
+					}
+				}
+
 				_channels.Clear();
 
 				if (_connection != null)
