@@ -124,7 +124,7 @@ namespace Shuttle.ESB.RabbitMQ
 
 		private void QueueDeclare(IModel model)
 		{
-			model.QueueDeclare(_parser.Queue, true, false, false, null);
+			model.QueueDeclare(_parser.Queue, _parser.Durable, false, false, null);
 		}
 
 		private IConnection GetConnection()

@@ -10,6 +10,7 @@ namespace Shuttle.ESB.RabbitMQ.Tests
 		public void Should_be_able_to_perform_simple_enqueue_and_get_message()
 		{
 			TestSimpleEnqueueAndGetMessage("rabbitmq://shuttle:shuttle!@localhost/{0}");
+			TestSimpleEnqueueAndGetMessage("rabbitmq://shuttle:shuttle!@localhost/{0}-transient?durable=false");
 		}
 
 		[Test]

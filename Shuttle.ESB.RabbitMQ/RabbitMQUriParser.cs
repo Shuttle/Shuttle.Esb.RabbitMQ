@@ -13,6 +13,7 @@ namespace Shuttle.ESB.RabbitMQ
 
 		public Uri Uri { get; private set; }
 		public bool Local { get; private set; }
+		public bool Durable { get; private set; }
 
 		public RabbitMQUriParser(Uri uri)
 		{
@@ -76,6 +77,7 @@ namespace Shuttle.ESB.RabbitMQ
 			var parameters = HttpUtility.ParseQueryString(uri.Query);
 
 			SetPrefetchCount(parameters);
+			SetDurability(parameters);
 		}
 
 		private void SetPrefetchCount(NameValueCollection parameters)
@@ -94,6 +96,25 @@ namespace Shuttle.ESB.RabbitMQ
 			if (ushort.TryParse(parameter, out result))
 			{
 				PrefetchCount = result;
+			}
+		}
+
+		private void SetDurability(NameValueCollection parameters)
+		{
+			Durable = true;
+
+			var parameter = parameters.Get("durable");
+
+			if (parameter == null)
+			{
+				return;
+			}
+
+			bool result;
+
+			if (bool.TryParse(parameter, out result))
+			{
+				Durable = result;
 			}
 		}
 
