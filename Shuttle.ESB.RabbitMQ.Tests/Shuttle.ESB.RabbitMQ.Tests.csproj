@@ -78,6 +78,7 @@
     <Compile Include="RabbitMQPipelineExceptionHandlingTest.cs" />
     <Compile Include="RabbitMQQueueTest.cs" />
     <Compile Include="RabbitMQResourceUsageTest.cs" />
+    <Compile Include="RabbitMQParserTest.cs" />
     <Compile Include="RabbitMQSection\RabbitMQSectionFixture.cs" />
     <Compile Include="RabbitMQSection\RabbitMQSectionTest.cs" />
   </ItemGroup>
