@@ -14,6 +14,7 @@ namespace Shuttle.ESB.RabbitMQ
 		public Uri Uri { get; private set; }
 		public bool Local { get; private set; }
 		public bool Durable { get; private set; }
+		public bool Persistent { get; private set; }
 
 		public RabbitMQUriParser(Uri uri)
 		{
@@ -78,6 +79,7 @@ namespace Shuttle.ESB.RabbitMQ
 
 			SetPrefetchCount(parameters);
 			SetDurability(parameters);
+			SetPersistent(parameters);
 		}
 
 		private void SetPrefetchCount(NameValueCollection parameters)
@@ -115,6 +117,25 @@ namespace Shuttle.ESB.RabbitMQ
 			if (bool.TryParse(parameter, out result))
 			{
 				Durable = result;
+			}
+		}
+
+		private void SetPersistent(NameValueCollection parameters)
+		{
+			Persistent = true;
+
+			var parameter = parameters.Get("persistent");
+
+			if (parameter == null)
+			{
+				return;
+			}
+
+			bool result;
+
+			if (bool.TryParse(parameter, out result))
+			{
+				Persistent = result;
 			}
 		}
 

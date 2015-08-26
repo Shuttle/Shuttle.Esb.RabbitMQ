@@ -90,7 +90,7 @@ namespace Shuttle.ESB.RabbitMQ
 
 					var properties = model.CreateBasicProperties();
 
-					properties.SetPersistent(true);
+					properties.Persistent = _parser.Persistent;
 					properties.CorrelationId = messageId.ToString();
 
 					model.BasicPublish("", _parser.Queue, false, false, properties, stream.ToBytes());
