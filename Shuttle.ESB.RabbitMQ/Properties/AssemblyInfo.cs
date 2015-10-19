@@ -18,11 +18,11 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("Shuttle.ESB.RabbitMQ for .NET Framework 4.5.2")]
 #endif
 
-[assembly: AssemblyVersion("3.5.3.0")]
+[assembly: AssemblyVersion("3.5.4.0")]
 [assembly: AssemblyCopyright("Copyright © Eben Roux 2010-2015")]
 [assembly: AssemblyProduct("Shuttle.ESB")]
 [assembly: AssemblyCompany("Shuttle")]
 [assembly: AssemblyConfiguration("Release")]
-[assembly: AssemblyInformationalVersion("3.5.3")]
+[assembly: AssemblyInformationalVersion("3.5.4")]
 [assembly: ComVisible(false)]
 
