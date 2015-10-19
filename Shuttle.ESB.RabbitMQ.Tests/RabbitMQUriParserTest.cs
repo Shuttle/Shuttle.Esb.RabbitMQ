@@ -4,7 +4,7 @@ using NUnit.Framework;
 namespace Shuttle.ESB.RabbitMQ.Tests
 {
 	[TestFixture]
-	public class RabbitMQParserTest
+	public class RabbitMQUriParserTest
 	{
 		[Test]
 		public void Should_be_able_to_parse_all_parameters()
