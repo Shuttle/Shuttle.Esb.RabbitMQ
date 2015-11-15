@@ -54,13 +54,13 @@
       <HintPath>..\packages\RabbitMQ.Client.3.5.6\lib\net40\RabbitMQ.Client.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Shuttle.Core.Infrastructure, Version=3.2.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\shuttle-core-infrastructure.3.2.0\lib\net40-full\Shuttle.Core.Infrastructure.dll</HintPath>
-      <Private>True</Private>
+    <Reference Include="Shuttle.Core.Infrastructure, Version=3.3.1.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\shuttle-core-infrastructure.3.3.1\lib\net40-full\Shuttle.Core.Infrastructure.dll</HintPath>
     </Reference>
-    <Reference Include="Shuttle.ESB.Core, Version=3.8.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\shuttle-esb-core.3.8.0\lib\net40-full\Shuttle.ESB.Core.dll</HintPath>
-      <Private>True</Private>
+    <Reference Include="Shuttle.ESB.Core, Version=4.0.3.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\shuttle-esb-core.4.0.3\lib\net40-full\Shuttle.ESB.Core.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
