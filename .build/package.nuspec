@@ -11,7 +11,7 @@
 		<requireLicenseAcceptance>false</requireLicenseAcceptance>
 		<description>RabbitMQ implementation for use with shuttle-esb.</description>
 		<releaseNotes/>
-		<copyright>Copyright (c) 2011-{year}, Eben Roux</copyright>
+		<copyright>Copyright (c) {year}, Eben Roux</copyright>
 		<tags>shuttle-esb rabbitmq</tags>
 		<dependencies>
 			<dependency id="RabbitMQ.Client" version="[{RabbitMQ.Client-version}]" />

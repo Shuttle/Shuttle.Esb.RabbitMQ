@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Shuttle.Core.Infrastructure;
 
 namespace Shuttle.ESB.RabbitMQ.Tests
 {
@@ -7,7 +8,7 @@ namespace Shuttle.ESB.RabbitMQ.Tests
     {
         protected RabbitMQSection GetRabbitMQSection(string file)
         {
-            return RabbitMQSection.Open(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, string.Format(@".\RabbitMQSection\files\{0}", file)));
+            return ConfigurationSectionProvider.OpenFile< RabbitMQSection>("shuttle","rabbitmq", Path.Combine(AppDomain.CurrentDomain.BaseDirectory, string.Format(@".\RabbitMQSection\files\{0}", file)));
         }
     }
 }
