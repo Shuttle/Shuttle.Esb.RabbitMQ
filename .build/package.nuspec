@@ -1,22 +1,22 @@
 <?xml version="1.0"?>
 <package >
 	<metadata>
-		<id>shuttle-esb-rabbitmq</id>
+		<id>Shuttle.Esb.RabbitMQ</id>
 		<version>{semver}</version>
 		<authors>Eben Roux</authors>
 		<owners>Eben Roux</owners>
-		<licenseUrl>https://github.com/shuttle/shuttle-esb-rabbitmq/raw/master/LICENSE</licenseUrl>
-		<projectUrl>https://github.com/shuttle/shuttle-esb-rabbitmq</projectUrl>
-		<iconUrl>https://raw.githubusercontent.com/Shuttle/shuttle-esb-rabbitmq/master/.media/logo.png</iconUrl>
+		<licenseUrl>https://github.com/shuttle/Shuttle.Esb.RabbitMQ/raw/master/LICENSE</licenseUrl>
+		<projectUrl>https://github.com/shuttle/Shuttle.Esb.RabbitMQ</projectUrl>
+		<iconUrl>https://raw.githubusercontent.com/Shuttle/Shuttle.Esb.RabbitMQ/master/.media/logo.png</iconUrl>
 		<requireLicenseAcceptance>false</requireLicenseAcceptance>
-		<description>RabbitMQ implementation for use with shuttle-esb.</description>
+		<description>RabbitMQ implementation for use with Shuttle.Esb.</description>
 		<releaseNotes/>
 		<copyright>Copyright (c) {year}, Eben Roux</copyright>
-		<tags>shuttle-esb rabbitmq</tags>
+		<tags>shuttle-esb shuttle-esb-rabbitmq rabbitmq</tags>
 		<dependencies>
 			<dependency id="RabbitMQ.Client" version="[{RabbitMQ.Client-version}]" />
-			<dependency id="shuttle-esb-core" version="{shuttle-esb-core-version}" />
-			<dependency id="shuttle-core-infrastructure" version="{shuttle-core-infrastructure-version}" />
+			<dependency id="Shuttle.Esb" version="{Shuttle.Esb-version}" />
+			<dependency id="Shuttle.Core.Infrastructure" version="{Shuttle.Core.Infrastructure-version}" />
 		</dependencies>
 	</metadata>
 </package>

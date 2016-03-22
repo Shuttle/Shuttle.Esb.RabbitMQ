@@ -1,4 +1,4 @@
-shuttle-esb-rabbitmq
+Shuttle.Esb.RabbitMQ
 ====================
 
-RabbitMQ implementation for use with shuttle-esb.
+RabbitMQ implementation for use with Shuttle.Esb.
