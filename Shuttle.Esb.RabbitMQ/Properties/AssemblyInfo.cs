@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 #if NET40FULL
@@ -26,10 +26,10 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("Shuttle.Esb.RabbitMQ for .NET Framework 4.6.1")]
 #endif
 
-[assembly: AssemblyVersion("3.9.6.0")]
+[assembly: AssemblyVersion("3.9.7.0")]
 [assembly: AssemblyCopyright("Copyright © Eben Roux 2016")]
 [assembly: AssemblyProduct("Shuttle.Esb")]
 [assembly: AssemblyCompany("Shuttle")]
 [assembly: AssemblyConfiguration("Release")]
-[assembly: AssemblyInformationalVersion("3.9.6")]
+[assembly: AssemblyInformationalVersion("3.9.7")]
 [assembly: ComVisible(false)]
