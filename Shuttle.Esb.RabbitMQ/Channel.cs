@@ -23,8 +23,8 @@ namespace Shuttle.Esb.RabbitMQ
 			_queue = parser.Queue;
 
 			_millisecondsTimeout = parser.Local
-						   ? configuration.LocalQueueTimeoutMilliseconds
-						   : configuration.RemoteQueueTimeoutMilliseconds;
+				? configuration.LocalQueueTimeoutMilliseconds
+				: configuration.RemoteQueueTimeoutMilliseconds;
 		}
 
 		public IModel Model { get; private set; }
@@ -37,12 +37,13 @@ namespace Shuttle.Esb.RabbitMQ
 
 			if (next && basicDeliverEventArgs == null)
 			{
-				throw new ConnectionException(string.Format(RabbitMQResources.SubscriptionNextConnectionException, _subscription.QueueName));
+				throw new ConnectionException(string.Format(RabbitMQResources.SubscriptionNextConnectionException,
+					_subscription.QueueName));
 			}
 
 			return (next)
-					   ? basicDeliverEventArgs
-					   : null;
+				? basicDeliverEventArgs
+				: null;
 		}
 
 		private Subscription GetSubscription()

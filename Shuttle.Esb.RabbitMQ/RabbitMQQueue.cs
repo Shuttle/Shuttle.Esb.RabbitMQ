@@ -5,7 +5,6 @@ using System.Threading;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using Shuttle.Core.Infrastructure;
-using Shuttle.Esb;
 
 namespace Shuttle.Esb.RabbitMQ
 {
@@ -45,14 +44,14 @@ namespace Shuttle.Esb.RabbitMQ
 			}
 
 			_factory = new ConnectionFactory
-				{
-					UserName = _parser.Username,
-					Password = _parser.Password,
-					HostName = _parser.Host,
-					VirtualHost = _parser.VirtualHost,
-					Port = _parser.Port,
-					RequestedHeartbeat = (ushort)configuration.RequestedHeartbeat
-				};
+			{
+				UserName = _parser.Username,
+				Password = _parser.Password,
+				HostName = _parser.Host,
+				VirtualHost = _parser.VirtualHost,
+				Port = _parser.Port,
+				RequestedHeartbeat = (ushort) configuration.RequestedHeartbeat
+			};
 		}
 
 		public Uri Uri { get; private set; }
@@ -79,37 +78,47 @@ namespace Shuttle.Esb.RabbitMQ
 			get { return !string.IsNullOrEmpty(_parser.Username) && !string.IsNullOrEmpty(_parser.Password); }
 		}
 
-		public void Enqueue(Guid messageId, Stream stream)
+		public void Enqueue(TransportMessage transportMessage, Stream stream)
 		{
-			Guard.AgainstNull(messageId, "messageId");
+			Guard.AgainstNull(transportMessage, "transportMessage");
 			Guard.AgainstNull(stream, "stream");
 
+			if (transportMessage.HasExpired())
+			{
+				return;
+			}
+
 			AccessQueue(() =>
+			{
+				var model = GetChannel().Model;
+
+				var properties = model.CreateBasicProperties();
+
+				properties.Persistent = _parser.Persistent;
+				properties.CorrelationId = transportMessage.MessageId.ToString();
+
+				if (transportMessage.HasExpiryDate())
 				{
-					var model = GetChannel().Model;
+					properties.Expiration = (transportMessage.ExpiryDate - DateTime.Now).Milliseconds.ToString();
+				}
 
-					var properties = model.CreateBasicProperties();
-
-					properties.Persistent = _parser.Persistent;
-					properties.CorrelationId = messageId.ToString();
-
-					model.BasicPublish("", _parser.Queue, false, false, properties, stream.ToBytes());
-				});
+				model.BasicPublish("", _parser.Queue, false, properties, stream.ToBytes());
+			});
 		}
 
 		public ReceivedMessage GetMessage()
 		{
 			return AccessQueue(() =>
+			{
+				var result = GetChannel().Next();
+
+				if (result == null)
 				{
-					var result = GetChannel().Next();
+					return null;
+				}
 
-					if (result == null)
-					{
-						return null;
-					}
-
-					return new ReceivedMessage(new MemoryStream(result.Body), result);
-				});
+				return new ReceivedMessage(new MemoryStream(result.Body), result);
+			});
 		}
 
 		public void Drop()
@@ -202,7 +211,8 @@ namespace Shuttle.Esb.RabbitMQ
 
 				var model = connection.CreateModel();
 
-				model.BasicQos(0, (ushort)(_parser.PrefetchCount == 0 ? _configuration.DefaultPrefetchCount : _parser.PrefetchCount), false);
+				model.BasicQos(0,
+					(ushort) (_parser.PrefetchCount == 0 ? _configuration.DefaultPrefetchCount : _parser.PrefetchCount), false);
 
 				QueueDeclare(model);
 
@@ -295,18 +305,19 @@ namespace Shuttle.Esb.RabbitMQ
 
 		public void Acknowledge(object acknowledgementToken)
 		{
-			AccessQueue(() => GetChannel().Acknowledge((BasicDeliverEventArgs)acknowledgementToken));
+			AccessQueue(() => GetChannel().Acknowledge((BasicDeliverEventArgs) acknowledgementToken));
 		}
 
 		public void Release(object acknowledgementToken)
 		{
 			AccessQueue(() =>
-				{
-					var basicDeliverEventArgs = (BasicDeliverEventArgs)acknowledgementToken;
+			{
+				var basicDeliverEventArgs = (BasicDeliverEventArgs) acknowledgementToken;
 
-					GetChannel().Model.BasicPublish("", _parser.Queue, false, false, basicDeliverEventArgs.BasicProperties, basicDeliverEventArgs.Body);
-					GetChannel().Acknowledge(basicDeliverEventArgs);
-				});
+				GetChannel()
+					.Model.BasicPublish("", _parser.Queue, false, basicDeliverEventArgs.BasicProperties, basicDeliverEventArgs.Body);
+				GetChannel().Acknowledge(basicDeliverEventArgs);
+			});
 		}
 
 		public void Purge()

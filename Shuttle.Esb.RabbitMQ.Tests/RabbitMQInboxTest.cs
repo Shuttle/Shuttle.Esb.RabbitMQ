@@ -31,5 +31,11 @@ namespace Shuttle.Esb.RabbitMQ.Tests
 		{
 			TestInboxDeferred("rabbitmq://shuttle:shuttle!@localhost/{0}");
 		}
+
+		[Test]
+		public void Should_be_able_to_expire_a_message()
+		{
+			TestInboxExpiry("rabbitmq://shuttle:shuttle!@localhost/{0}", true);
+		}
 	}
 }

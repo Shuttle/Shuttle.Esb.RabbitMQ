@@ -30,11 +30,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
-    <Framework Condition=" '$(Framework)' == '' ">net40-full</Framework>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Framework)' == 'net40-full'">
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
-    <DefineConstants>$(DefineConstants);NET40FULL</DefineConstants>
+    <Framework Condition=" '$(Framework)' == '' ">net45-full</Framework>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Framework)' == 'net45-full'">
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
@@ -57,16 +53,16 @@
     <DefineConstants>$(DefineConstants);NET461FULL</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="RabbitMQ.Client, Version=3.5.7.0, Culture=neutral, PublicKeyToken=89e7d7c5feba84ce, processorArchitecture=MSIL">
-      <HintPath>..\packages\RabbitMQ.Client.3.5.7\lib\net40\RabbitMQ.Client.dll</HintPath>
+    <Reference Include="RabbitMQ.Client, Version=3.6.1.0, Culture=neutral, PublicKeyToken=89e7d7c5feba84ce, processorArchitecture=MSIL">
+      <HintPath>..\packages\RabbitMQ.Client.3.6.1\lib\net45\RabbitMQ.Client.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Shuttle.Core.Infrastructure, Version=4.1.11.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Shuttle.Core.Infrastructure.4.1.11\lib\net40-full\Shuttle.Core.Infrastructure.dll</HintPath>
+    <Reference Include="Shuttle.Core.Infrastructure, Version=4.1.12.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Shuttle.Core.Infrastructure.4.1.12\lib\net45-full\Shuttle.Core.Infrastructure.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Shuttle.Esb, Version=5.1.9.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Shuttle.Esb.5.1.9\lib\net40-full\Shuttle.Esb.dll</HintPath>
+    <Reference Include="Shuttle.Esb, Version=5.1.12.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Shuttle.Esb.5.1.12\lib\net45-full\Shuttle.Esb.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />

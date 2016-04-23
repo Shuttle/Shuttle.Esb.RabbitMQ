@@ -1,5 +1,4 @@
-using System;
-using System.Reflection;
+﻿using System.Reflection;
 using System.Runtime.InteropServices;
 
 #if NET40FULL
@@ -7,6 +6,7 @@ using System.Runtime.InteropServices;
 #endif
 
 #if NET45FULL
+
 [assembly: AssemblyTitle("Shuttle.Esb.RabbitMQ for .NET Framework 4.5")]
 #endif
 
@@ -33,4 +33,3 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("Release")]
 [assembly: AssemblyInformationalVersion("3.9.6")]
 [assembly: ComVisible(false)]
-

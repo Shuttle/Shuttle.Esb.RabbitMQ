@@ -1,6 +1,5 @@
 ﻿using System;
 using Shuttle.Core.Infrastructure;
-using Shuttle.Esb;
 
 namespace Shuttle.Esb.RabbitMQ
 {

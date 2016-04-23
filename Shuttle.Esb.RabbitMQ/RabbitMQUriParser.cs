@@ -3,7 +3,6 @@ using System.Collections.Specialized;
 using System.Linq;
 using System.Web;
 using Shuttle.Core.Infrastructure;
-using Shuttle.Esb;
 
 namespace Shuttle.Esb.RabbitMQ
 {
@@ -39,22 +38,22 @@ namespace Shuttle.Esb.RabbitMQ
 			switch (uri.Segments.Length)
 			{
 				case 2:
-					{
-						VirtualHost = "/";
-						Queue = uri.Segments[1];
-						break;
-					}
+				{
+					VirtualHost = "/";
+					Queue = uri.Segments[1];
+					break;
+				}
 				case 3:
-					{
-						VirtualHost = uri.Segments[1];
-						Queue = uri.Segments[2];
-						break;
-					}
+				{
+					VirtualHost = uri.Segments[1];
+					Queue = uri.Segments[2];
+					break;
+				}
 				default:
-					{
-						throw new UriFormatException(string.Format(EsbResources.UriFormatException,
-																   "rabbitmq://[username:password@]host:port/[vhost/]queue", Uri));
-					}
+				{
+					throw new UriFormatException(string.Format(EsbResources.UriFormatException,
+						"rabbitmq://[username:password@]host:port/[vhost/]queue", Uri));
+				}
 			}
 
 			if (Host.Equals("."))
@@ -146,6 +145,5 @@ namespace Shuttle.Esb.RabbitMQ
 		public int Port { get; private set; }
 		public string VirtualHost { get; private set; }
 		public string Queue { get; private set; }
-
 	}
 }

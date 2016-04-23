@@ -1,1 +1,0 @@
-- applied shuttle-core-msbuild v1.1.1
