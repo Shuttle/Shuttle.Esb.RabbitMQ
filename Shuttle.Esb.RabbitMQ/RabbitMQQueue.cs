@@ -99,7 +99,14 @@ namespace Shuttle.Esb.RabbitMQ
 
 				if (transportMessage.HasExpiryDate())
 				{
-					properties.Expiration = (transportMessage.ExpiryDate - DateTime.Now).Milliseconds.ToString();
+					var milliseconds = (transportMessage.ExpiryDate - DateTime.Now).Milliseconds;
+
+					if (milliseconds < 1)
+					{
+						return;
+					}
+
+					properties.Expiration = milliseconds.ToString();
 				}
 
 				model.BasicPublish("", _parser.Queue, false, properties, stream.ToBytes());
