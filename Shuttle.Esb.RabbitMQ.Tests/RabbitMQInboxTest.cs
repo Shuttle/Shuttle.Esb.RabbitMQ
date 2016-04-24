@@ -35,7 +35,7 @@ namespace Shuttle.Esb.RabbitMQ.Tests
 		[Test]
 		public void Should_be_able_to_expire_a_message()
 		{
-			TestInboxExpiry("rabbitmq://shuttle:shuttle!@localhost/{0}", true);
+			TestInboxExpiry("rabbitmq://shuttle:shuttle!@localhost/{0}");
 		}
 	}
 }
