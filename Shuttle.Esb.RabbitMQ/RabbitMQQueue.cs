@@ -99,7 +99,7 @@ namespace Shuttle.Esb.RabbitMQ
 
 				if (transportMessage.HasExpiryDate())
 				{
-					var milliseconds = (transportMessage.ExpiryDate - DateTime.Now).TotalMilliseconds;
+					var milliseconds = (long) (transportMessage.ExpiryDate - DateTime.Now).TotalMilliseconds;
 
 					if (milliseconds < 1)
 					{
