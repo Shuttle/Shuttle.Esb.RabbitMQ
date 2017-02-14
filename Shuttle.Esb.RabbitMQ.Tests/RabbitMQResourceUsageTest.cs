@@ -10,7 +10,7 @@ namespace Shuttle.Esb.RabbitMQ.Tests
 		[TestCase(true)]
 		public void Should_not_exceeed_normal_resource_usage(bool isTransactionalEndpoint)
 		{
-			TestResourceUsage("rabbitmq://shuttle:shuttle!@localhost/{0}", isTransactionalEndpoint);
+			TestResourceUsage(RabbitMQFixture.GetComponentContainer(), "rabbitmq://shuttle:shuttle!@localhost/{0}", isTransactionalEndpoint);
 		}
 	}
 }
