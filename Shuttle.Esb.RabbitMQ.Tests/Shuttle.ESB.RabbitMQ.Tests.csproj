@@ -56,20 +56,20 @@
       <HintPath>..\packages\Shuttle.Core.Castle.8.0.0\lib\net451-full\Shuttle.Core.Castle.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Shuttle.Core.Infrastructure, Version=8.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Shuttle.Core.Infrastructure.8.0.0\lib\net451-full\Shuttle.Core.Infrastructure.dll</HintPath>
+    <Reference Include="Shuttle.Core.Infrastructure, Version=8.0.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Shuttle.Core.Infrastructure.8.0.2\lib\net451-full\Shuttle.Core.Infrastructure.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Shuttle.Core.Log4Net, Version=8.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Shuttle.Core.Log4Net.8.0.0\lib\net451-full\Shuttle.Core.Log4Net.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Shuttle.Esb, Version=8.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Shuttle.Esb.8.0.0\lib\net451-full\Shuttle.Esb.dll</HintPath>
+    <Reference Include="Shuttle.Esb, Version=8.0.7.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Shuttle.Esb.8.0.7\lib\net451-full\Shuttle.Esb.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Shuttle.Esb.Tests, Version=8.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Shuttle.Esb.Tests.8.0.0\lib\net451-full\Shuttle.Esb.Tests.dll</HintPath>
+    <Reference Include="Shuttle.Esb.Tests, Version=8.0.4.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Shuttle.Esb.Tests.8.0.4\lib\net451-full\Shuttle.Esb.Tests.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
