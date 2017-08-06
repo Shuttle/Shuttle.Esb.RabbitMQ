@@ -52,7 +52,7 @@ namespace Shuttle.Esb.RabbitMQ
 				default:
 				{
 					throw new UriFormatException(string.Format(EsbResources.UriFormatException,
-						"rabbitmq://[username:password@]host:port/[vhost/]queue", Uri));
+						"rabbitmq://[username:password@]host:port/[vhost/]queue", uri));
 				}
 			}
 
