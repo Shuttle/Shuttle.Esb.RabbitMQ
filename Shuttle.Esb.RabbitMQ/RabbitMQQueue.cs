@@ -4,7 +4,8 @@ using System.IO;
 using System.Threading;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using Shuttle.Core.Infrastructure;
+using Shuttle.Core.Contract;
+using Shuttle.Core.Streams;
 
 namespace Shuttle.Esb.RabbitMQ
 {
@@ -12,9 +13,9 @@ namespace Shuttle.Esb.RabbitMQ
 	{
 		private readonly IRabbitMQConfiguration _configuration;
 
-		private static readonly object _connectionLock = new object();
-		private static readonly object _queueLock = new object();
-		private static readonly object _disposeLock = new object();
+		private static readonly object ConnectionLock = new object();
+		private static readonly object QueueLock = new object();
+		private static readonly object DisposeLock = new object();
 
 		private readonly int _operationRetryCount;
 
@@ -50,11 +51,11 @@ namespace Shuttle.Esb.RabbitMQ
 				HostName = _parser.Host,
 				VirtualHost = _parser.VirtualHost,
 				Port = _parser.Port,
-				RequestedHeartbeat = (ushort) configuration.RequestedHeartbeat
+				RequestedHeartbeat = configuration.RequestedHeartbeat
 			};
 		}
 
-		public Uri Uri { get; private set; }
+		public Uri Uri { get; }
 
 		public bool IsEmpty()
 		{
@@ -73,12 +74,9 @@ namespace Shuttle.Esb.RabbitMQ
 			});
 		}
 
-		public bool HasUserInfo
-		{
-			get { return !string.IsNullOrEmpty(_parser.Username) && !string.IsNullOrEmpty(_parser.Password); }
-		}
+		public bool HasUserInfo => !string.IsNullOrEmpty(_parser.Username) && !string.IsNullOrEmpty(_parser.Password);
 
-		public void Enqueue(TransportMessage transportMessage, Stream stream)
+	    public void Enqueue(TransportMessage transportMessage, Stream stream)
 		{
 			Guard.AgainstNull(transportMessage, "transportMessage");
 			Guard.AgainstNull(stream, "stream");
@@ -150,7 +148,7 @@ namespace Shuttle.Esb.RabbitMQ
 				return _connection;
 			}
 
-			lock (_connectionLock)
+			lock (ConnectionLock)
 			{
 				if (_connection != null && !_connection.IsOpen)
 				{
@@ -158,11 +156,12 @@ namespace Shuttle.Esb.RabbitMQ
 					{
 						_connection.Dispose();
 					}
-					catch (Exception)
-					{
-					}
+				    catch (Exception)
+				    {
+				        // ignored
+				    }
 
-					_connection = null;
+				    _connection = null;
 				}
 
 				if (_connection == null)
@@ -187,7 +186,7 @@ namespace Shuttle.Esb.RabbitMQ
 				return channel;
 			}
 
-			lock (_queueLock)
+			lock (QueueLock)
 			{
 				channel = FindChannel(key);
 
@@ -213,7 +212,7 @@ namespace Shuttle.Esb.RabbitMQ
 
 				if (connection == null)
 				{
-					throw new ConnectionException(string.Format(RabbitMQResources.ConnectionException, Uri.Secured()));
+					throw new ConnectionException(string.Format(Resources.ConnectionException, Uri.Secured()));
 				}
 
 				var model = connection.CreateModel();
@@ -245,11 +244,12 @@ namespace Shuttle.Esb.RabbitMQ
 					{
 						channel.Dispose();
 					}
-					catch (Exception)
-					{
-					}
+				    catch (Exception)
+				    {
+				        // ignored
+				    }
 
-					_channels.Remove(key);
+				    _channels.Remove(key);
 					channel = null;
 				}
 			}
@@ -259,7 +259,7 @@ namespace Shuttle.Esb.RabbitMQ
 
 		public void Dispose()
 		{
-			lock (_disposeLock)
+			lock (DisposeLock)
 			{
 				foreach (var value in _channels.Values)
 				{
@@ -274,18 +274,20 @@ namespace Shuttle.Esb.RabbitMQ
 						{
 							value.Model.Dispose();
 						}
-						catch (Exception)
-						{
-						}
+					    catch (Exception)
+					    {
+					        // ignored
+					    }
 					}
 
 					try
 					{
 						value.Dispose();
 					}
-					catch (Exception)
-					{
-					}
+				    catch (Exception)
+				    {
+				        // ignored
+				    }
 				}
 
 				_channels.Clear();
@@ -301,11 +303,12 @@ namespace Shuttle.Esb.RabbitMQ
 					{
 						_connection.Dispose();
 					}
-					catch (Exception)
-					{
-					}
+				    catch (Exception)
+				    {
+				        // ignored
+				    }
 
-					_connection = null;
+				    _connection = null;
 				}
 			}
 		}

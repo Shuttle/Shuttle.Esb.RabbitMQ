@@ -1,23 +1,20 @@
 ﻿using System;
-using Shuttle.Core.Infrastructure;
+using Shuttle.Core.Contract;
 
 namespace Shuttle.Esb.RabbitMQ
 {
 	public class RabbitMQQueueFactory : IQueueFactory
 	{
-		public IRabbitMQConfiguration Configuration { get; private set; }
+		public IRabbitMQConfiguration Configuration { get; }
 
 		public RabbitMQQueueFactory(IRabbitMQConfiguration configuration)
 		{
 			Configuration = configuration;
 		}
 
-		public string Scheme
-		{
-			get { return RabbitMQUriParser.SCHEME; }
-		}
+		public string Scheme => RabbitMQUriParser.Scheme;
 
-		public IQueue Create(Uri uri)
+	    public IQueue Create(Uri uri)
 		{
 			Guard.AgainstNull(uri, "uri");
 

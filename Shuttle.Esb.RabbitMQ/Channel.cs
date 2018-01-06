@@ -2,7 +2,7 @@
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using RabbitMQ.Client.MessagePatterns;
-using Shuttle.Core.Infrastructure;
+using Shuttle.Core.Contract;
 
 namespace Shuttle.Esb.RabbitMQ
 {
@@ -27,17 +27,15 @@ namespace Shuttle.Esb.RabbitMQ
 				: configuration.RemoteQueueTimeoutMilliseconds;
 		}
 
-		public IModel Model { get; private set; }
+		public IModel Model { get; }
 
 		public BasicDeliverEventArgs Next()
 		{
-			BasicDeliverEventArgs basicDeliverEventArgs;
-
-			var next = GetSubscription().Next(_millisecondsTimeout, out basicDeliverEventArgs);
+		    var next = GetSubscription().Next(_millisecondsTimeout, out var basicDeliverEventArgs);
 
 			if (next && basicDeliverEventArgs == null)
 			{
-				throw new ConnectionException(string.Format(RabbitMQResources.SubscriptionNextConnectionException,
+				throw new ConnectionException(string.Format(Resources.SubscriptionNextConnectionException,
 					_subscription.QueueName));
 			}
 

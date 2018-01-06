@@ -1,30 +1,38 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 
-#if NET451FULL
-[assembly: AssemblyTitle("Shuttle.Esb.RabbitMQ for .NET Framework 4.5.1")]
+#if NET46
+[assembly: AssemblyTitle(".NET Framework 4.6")]
 #endif
 
-#if NET452FULL
-[assembly: AssemblyTitle("Shuttle.Esb.RabbitMQ for .NET Framework 4.5.2")]
+#if NET461
+[assembly: AssemblyTitle(".NET Framework 4.6.1")]
 #endif
 
-#if NET46FULL
-[assembly: AssemblyTitle("Shuttle.Esb.RabbitMQ for .NET Framework 4.6")]
+#if NET462
+[assembly: AssemblyTitle(".NET Framework 4.6.2")]
 #endif
 
-#if NET461FULL
-[assembly: AssemblyTitle("Shuttle.Esb.RabbitMQ for .NET Framework 4.6.1")]
+#if NET47
+[assembly: AssemblyTitle(".NET Framework 4.7")]
 #endif
 
-#if NET462FULL
-[assembly: AssemblyTitle("Shuttle.Esb.RabbitMQ for .NET Framework 4.6.2")]
+#if NET471
+[assembly: AssemblyTitle(".NET Framework 4.7.1")]
 #endif
 
-[assembly: AssemblyVersion("9.0.1.0")]
-[assembly: AssemblyCopyright("Copyright © Eben Roux 2017")]
-[assembly: AssemblyProduct("Shuttle.Esb")]
+#if NETCOREAPP2_0
+[assembly: AssemblyTitle(".NET Core 2.0")]
+#endif
+
+#if NETSTANDARD2_0
+[assembly: AssemblyTitle(".NET Standard 2.0")]
+#endif
+
+[assembly: AssemblyVersion("10.0.0.0")]
+[assembly: AssemblyCopyright("Copyright © Eben Roux 2018")]
+[assembly: AssemblyProduct("Shuttle.Esb.RabbitMQ")]
 [assembly: AssemblyCompany("Shuttle")]
 [assembly: AssemblyConfiguration("Release")]
-[assembly: AssemblyInformationalVersion("9.0.1")]
+[assembly: AssemblyInformationalVersion("10.0.0")]
 [assembly: ComVisible(false)]

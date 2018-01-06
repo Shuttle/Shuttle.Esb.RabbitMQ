@@ -1,149 +1,142 @@
 ﻿using System;
-using System.Collections.Specialized;
 using System.Linq;
-using System.Web;
-using Shuttle.Core.Infrastructure;
+using Shuttle.Core.Contract;
+using Shuttle.Core.Uris;
 
 namespace Shuttle.Esb.RabbitMQ
 {
-	public class RabbitMQUriParser
-	{
-		internal const string SCHEME = "rabbitmq";
+    public class RabbitMQUriParser
+    {
+        internal const string Scheme = "rabbitmq";
 
-		public Uri Uri { get; private set; }
-		public bool Local { get; private set; }
-		public bool Durable { get; private set; }
-		public bool Persistent { get; private set; }
+        public RabbitMQUriParser(Uri uri)
+        {
+            Guard.AgainstNull(uri, "uri");
 
-		public RabbitMQUriParser(Uri uri)
-		{
-			Guard.AgainstNull(uri, "uri");
+            if (!uri.Scheme.Equals(Scheme, StringComparison.InvariantCultureIgnoreCase))
+            {
+                throw new InvalidSchemeException(Scheme, uri.ToString());
+            }
 
-			if (!uri.Scheme.Equals(SCHEME, StringComparison.InvariantCultureIgnoreCase))
-			{
-				throw new InvalidSchemeException(SCHEME, uri.ToString());
-			}
+            Password = "";
+            Username = "";
+            Port = uri.Port;
+            Host = uri.Host;
 
-			Password = "";
-			Username = "";
-			Port = uri.Port;
-			Host = uri.Host;
+            if (uri.UserInfo.Contains(':'))
+            {
+                Username = uri.UserInfo.Split(':').First();
+                Password = uri.UserInfo.Split(':').Last();
+            }
 
-			if (uri.UserInfo.Contains(':'))
-			{
-				Username = uri.UserInfo.Split(':').First();
-				Password = uri.UserInfo.Split(':').Last();
-			}
+            switch (uri.Segments.Length)
+            {
+                case 2:
+                {
+                    VirtualHost = "/";
+                    Queue = uri.Segments[1];
+                    break;
+                }
+                case 3:
+                {
+                    VirtualHost = uri.Segments[1];
+                    Queue = uri.Segments[2];
+                    break;
+                }
+                default:
+                {
+                    throw new UriFormatException(string.Format(Esb.Resources.UriFormatException,
+                        "rabbitmq://[username:password@]host:port/[vhost/]queue", uri));
+                }
+            }
 
-			switch (uri.Segments.Length)
-			{
-				case 2:
-				{
-					VirtualHost = "/";
-					Queue = uri.Segments[1];
-					break;
-				}
-				case 3:
-				{
-					VirtualHost = uri.Segments[1];
-					Queue = uri.Segments[2];
-					break;
-				}
-				default:
-				{
-					throw new UriFormatException(string.Format(EsbResources.UriFormatException,
-						"rabbitmq://[username:password@]host:port/[vhost/]queue", uri));
-				}
-			}
+            if (Host.Equals("."))
+            {
+                Host = "localhost";
+            }
 
-			if (Host.Equals("."))
-			{
-				Host = "localhost";
-			}
+            var builder = new UriBuilder(uri)
+            {
+                Host = Host,
+                Port = Port,
+                UserName = Username,
+                Password = Password,
+                Path = VirtualHost == "/" ? $"/{Queue}" : $"/{VirtualHost}/{Queue}"
+            };
 
-			var builder = new UriBuilder(uri)
-			{
-				Host = Host,
-				Port = Port,
-				UserName = Username,
-				Password = Password,
-				Path = VirtualHost == "/" ? string.Format("/{0}", Queue) : string.Format("/{0}/{1}", VirtualHost, Queue)
-			};
+            Uri = builder.Uri;
 
-			Uri = builder.Uri;
+            Local = Uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || Uri.Host.Equals("127.0.0.1");
 
-			Local = Uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || Uri.Host.Equals("127.0.0.1");
+            var queryString = new QueryString(uri);
 
-			var parameters = HttpUtility.ParseQueryString(uri.Query);
+            SetPrefetchCount(queryString);
+            SetDurability(queryString);
+            SetPersistent(queryString);
+        }
 
-			SetPrefetchCount(parameters);
-			SetDurability(parameters);
-			SetPersistent(parameters);
-		}
+        public Uri Uri { get; }
+        public bool Local { get; }
+        public bool Durable { get; private set; }
+        public bool Persistent { get; private set; }
 
-		private void SetPrefetchCount(NameValueCollection parameters)
-		{
-			PrefetchCount = 0;
+        public int PrefetchCount { get; private set; }
+        public string Username { get; }
+        public string Password { get; }
+        public string Host { get; }
+        public int Port { get; }
+        public string VirtualHost { get; }
+        public string Queue { get; }
 
-			var parameter = parameters.Get("prefetchCount");
+        private void SetPrefetchCount(QueryString queryString)
+        {
+            PrefetchCount = 0;
 
-			if (parameter == null)
-			{
-				return;
-			}
+            var parameter = queryString["prefetchCount"];
 
-			ushort result;
+            if (parameter == null)
+            {
+                return;
+            }
 
-			if (ushort.TryParse(parameter, out result))
-			{
-				PrefetchCount = result;
-			}
-		}
+            if (ushort.TryParse(parameter, out var result))
+            {
+                PrefetchCount = result;
+            }
+        }
 
-		private void SetDurability(NameValueCollection parameters)
-		{
-			Durable = true;
+        private void SetDurability(QueryString queryString)
+        {
+            Durable = true;
 
-			var parameter = parameters.Get("durable");
+            var parameter = queryString["durable"];
 
-			if (parameter == null)
-			{
-				return;
-			}
+            if (parameter == null)
+            {
+                return;
+            }
 
-			bool result;
+            if (bool.TryParse(parameter, out var result))
+            {
+                Durable = result;
+            }
+        }
 
-			if (bool.TryParse(parameter, out result))
-			{
-				Durable = result;
-			}
-		}
+        private void SetPersistent(QueryString parameters)
+        {
+            Persistent = true;
 
-		private void SetPersistent(NameValueCollection parameters)
-		{
-			Persistent = true;
+            var parameter = parameters["persistent"];
 
-			var parameter = parameters.Get("persistent");
+            if (parameter == null)
+            {
+                return;
+            }
 
-			if (parameter == null)
-			{
-				return;
-			}
-
-			bool result;
-
-			if (bool.TryParse(parameter, out result))
-			{
-				Persistent = result;
-			}
-		}
-
-		public int PrefetchCount { get; private set; }
-		public string Username { get; private set; }
-		public string Password { get; private set; }
-		public string Host { get; private set; }
-		public int Port { get; private set; }
-		public string VirtualHost { get; private set; }
-		public string Queue { get; private set; }
-	}
+            if (bool.TryParse(parameter, out var result))
+            {
+                Persistent = result;
+            }
+        }
+    }
 }
