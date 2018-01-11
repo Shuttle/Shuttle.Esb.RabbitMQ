@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+
+<package>
+  <metadata>
+    <id>Shuttle.Esb.RabbitMQ</id>
+    <version>{semver}</version>
+    <authors>Eben Roux</authors>
+    <owners>Eben Roux</owners>
+    <licenseUrl>https://github.com/shuttle/Shuttle.Esb.RabbitMQ/raw/master/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/shuttle/Shuttle.Esb.RabbitMQ</projectUrl>
+    <iconUrl>https://raw.githubusercontent.com/Shuttle/Shuttle.Esb.RabbitMQ/master/.media/logo.png</iconUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>RabbitMQ implementation for use with Shuttle.Esb.</description>
+    <releaseNotes />
+    <copyright>Copyright (c) {year}, Eben Roux</copyright>
+    <tags>shuttle rabbitmq</tags>
+    <dependencies>
+      <group>
+        <dependency id="RabbitMQ.Client" version="[{RabbitMQ.Client-version}]" />
+        <dependency id="Shuttle.Esb" version="{Shuttle.Esb-version}" />
+        <dependency id="Shuttle.Core.Container" version="{Shuttle.Core.Container-version}" />
+        <dependency id="Shuttle.Core.Uris" version="{Shuttle.Core.Uris-version}" />
+      </group>
+
+      <group targetFramework="netstandard2.0">
+        <dependency id="RabbitMQ.Client" version="[{RabbitMQ.Client-version}]" />
+        <dependency id="Shuttle.Esb" version="{Shuttle.Esb-version}" />
+        <dependency id="Shuttle.Core.Container" version="{Shuttle.Core.Container-version}" />
+        <dependency id="Shuttle.Core.Uris" version="{Shuttle.Core.Uris-version}" />
+        <dependency id="System.Configuration.ConfigurationManager" version="{System.Configuration.ConfigurationManager-version}" />
+      </group>
+
+      <group targetFramework="netcoreapp2.0">
+        <dependency id="RabbitMQ.Client" version="[{RabbitMQ.Client-version}]" />
+        <dependency id="Shuttle.Esb" version="{Shuttle.Esb-version}" />
+        <dependency id="Shuttle.Core.Container" version="{Shuttle.Core.Container-version}" />
+        <dependency id="Shuttle.Core.Uris" version="{Shuttle.Core.Uris-version}" />
+        <dependency id="System.Configuration.ConfigurationManager" version="{System.Configuration.ConfigurationManager-version}" />
+      </group>
+    </dependencies>
+  </metadata>
+</package>
