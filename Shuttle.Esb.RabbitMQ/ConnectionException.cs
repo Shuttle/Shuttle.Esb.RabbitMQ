@@ -2,10 +2,10 @@
 
 namespace Shuttle.Esb.RabbitMQ
 {
-	internal class ConnectionException : Exception
-	{
-		public ConnectionException(string message) : base(message)
-		{
-		}
-	}
+    internal class ConnectionException : Exception
+    {
+        public ConnectionException(string message) : base(message)
+        {
+        }
+    }
 }
