@@ -2,10 +2,10 @@
 
 namespace Shuttle.Esb.RabbitMQ
 {
-	public class RabbitMQQueueException : Exception
-	{
-		public RabbitMQQueueException(string message) : base(message)
-		{
-		}
-	}
+    public class RabbitMQQueueException : Exception
+    {
+        public RabbitMQQueueException(string message) : base(message)
+        {
+        }
+    }
 }

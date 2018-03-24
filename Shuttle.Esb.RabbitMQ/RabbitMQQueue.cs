@@ -9,368 +9,368 @@ using Shuttle.Core.Streams;
 
 namespace Shuttle.Esb.RabbitMQ
 {
-	public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IDisposable, IPurgeQueue
-	{
-		private readonly IRabbitMQConfiguration _configuration;
+    public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IDisposable, IPurgeQueue
+    {
+        private readonly IRabbitMQConfiguration _configuration;
 
-		private static readonly object ConnectionLock = new object();
-		private static readonly object QueueLock = new object();
-		private static readonly object DisposeLock = new object();
+        private static readonly object ConnectionLock = new object();
+        private static readonly object QueueLock = new object();
+        private static readonly object DisposeLock = new object();
 
-		private readonly int _operationRetryCount;
+        private readonly int _operationRetryCount;
 
-		private readonly RabbitMQUriParser _parser;
+        private readonly RabbitMQUriParser _parser;
 
-		private readonly ConnectionFactory _factory;
-		private volatile IConnection _connection;
+        private readonly ConnectionFactory _factory;
+        private volatile IConnection _connection;
 
-		private readonly Dictionary<int, Channel> _channels = new Dictionary<int, Channel>();
+        private readonly Dictionary<int, Channel> _channels = new Dictionary<int, Channel>();
 
-		public RabbitMQQueue(Uri uri, IRabbitMQConfiguration configuration)
-		{
-			Guard.AgainstNull(uri, "uri");
-			Guard.AgainstNull(configuration, "configuration");
+        public RabbitMQQueue(Uri uri, IRabbitMQConfiguration configuration)
+        {
+            Guard.AgainstNull(uri, "uri");
+            Guard.AgainstNull(configuration, "configuration");
 
-			_parser = new RabbitMQUriParser(uri);
+            _parser = new RabbitMQUriParser(uri);
 
-			Uri = _parser.Uri;
+            Uri = _parser.Uri;
 
-			_configuration = configuration;
+            _configuration = configuration;
 
-			_operationRetryCount = _configuration.OperationRetryCount;
+            _operationRetryCount = _configuration.OperationRetryCount;
 
-			if (_operationRetryCount < 1)
-			{
-				_operationRetryCount = 3;
-			}
+            if (_operationRetryCount < 1)
+            {
+                _operationRetryCount = 3;
+            }
 
-			_factory = new ConnectionFactory
-			{
-				UserName = _parser.Username,
-				Password = _parser.Password,
-				HostName = _parser.Host,
-				VirtualHost = _parser.VirtualHost,
-				Port = _parser.Port,
-				RequestedHeartbeat = configuration.RequestedHeartbeat
-			};
-		}
-
-		public Uri Uri { get; }
-
-		public bool IsEmpty()
-		{
-			return AccessQueue(() =>
-			{
-				var result = GetChannel().Model.BasicGet(_parser.Queue, false);
-
-				if (result == null)
-				{
-					return true;
-				}
-
-				GetChannel().Model.BasicReject(result.DeliveryTag, true);
-
-				return false;
-			});
-		}
-
-		public bool HasUserInfo => !string.IsNullOrEmpty(_parser.Username) && !string.IsNullOrEmpty(_parser.Password);
-
-	    public void Enqueue(TransportMessage transportMessage, Stream stream)
-		{
-			Guard.AgainstNull(transportMessage, "transportMessage");
-			Guard.AgainstNull(stream, "stream");
-
-			if (transportMessage.HasExpired())
-			{
-				return;
-			}
-
-			AccessQueue(() =>
-			{
-				var model = GetChannel().Model;
-
-				var properties = model.CreateBasicProperties();
-
-				properties.Persistent = _parser.Persistent;
-				properties.CorrelationId = transportMessage.MessageId.ToString();
-
-				if (transportMessage.HasExpiryDate())
-				{
-					var milliseconds = (long) (transportMessage.ExpiryDate - DateTime.Now).TotalMilliseconds;
-
-					if (milliseconds < 1)
-					{
-						return;
-					}
-
-					properties.Expiration = milliseconds.ToString();
-				}
-
-				model.BasicPublish("", _parser.Queue, false, properties, stream.ToBytes());
-			});
-		}
-
-		public ReceivedMessage GetMessage()
-		{
-			return AccessQueue(() =>
-			{
-				var result = GetChannel().Next();
-
-				if (result == null)
-				{
-					return null;
-				}
-
-				return new ReceivedMessage(new MemoryStream(result.Body), result);
-			});
-		}
-
-		public void Drop()
-		{
-			AccessQueue(() => { GetChannel().Model.QueueDelete(_parser.Queue); });
-		}
-
-		public void Create()
-		{
-			AccessQueue(() => QueueDeclare(GetChannel().Model));
-		}
-
-		private void QueueDeclare(IModel model)
-		{
-			model.QueueDeclare(_parser.Queue, _parser.Durable, false, false, null);
-		}
-
-		private IConnection GetConnection()
-		{
-			if (_connection != null && _connection.IsOpen)
-			{
-				return _connection;
-			}
-
-			lock (ConnectionLock)
-			{
-				if (_connection != null && !_connection.IsOpen)
-				{
-					try
-					{
-						_connection.Dispose();
-					}
-				    catch (Exception)
-				    {
-				        // ignored
-				    }
-
-				    _connection = null;
-				}
-
-				if (_connection == null)
-				{
-					_connection = _factory.CreateConnection();
-				}
-
-				_connection.AutoClose = false;
-			}
-
-			return _connection;
-		}
-
-		private Channel GetChannel()
-		{
-			var key = Thread.CurrentThread.ManagedThreadId;
-
-			var channel = FindChannel(key);
-
-			if (channel != null)
-			{
-				return channel;
-			}
-
-			lock (QueueLock)
-			{
-				channel = FindChannel(key);
-
-				if (channel != null)
-				{
-					return channel;
-				}
-
-				var retry = 0;
-				IConnection connection = null;
-
-				while (connection == null && retry < _operationRetryCount)
-				{
-					try
-					{
-						connection = GetConnection();
-					}
-					catch (Exception)
-					{
-						retry++;
-					}
-				}
-
-				if (connection == null)
-				{
-					throw new ConnectionException(string.Format(Resources.ConnectionException, Uri.Secured()));
-				}
-
-				var model = connection.CreateModel();
-
-				model.BasicQos(0,
-					(ushort) (_parser.PrefetchCount == 0 ? _configuration.DefaultPrefetchCount : _parser.PrefetchCount), false);
-
-				QueueDeclare(model);
-
-				channel = new Channel(model, _parser, _configuration);
-
-				_channels.Add(key, channel);
-
-				return channel;
-			}
-		}
-
-		private Channel FindChannel(int key)
-		{
-			Channel channel = null;
-
-			if (_channels.ContainsKey(key))
-			{
-				channel = _channels[key];
-
-				if (!channel.Model.IsOpen)
-				{
-					try
-					{
-						channel.Dispose();
-					}
-				    catch (Exception)
-				    {
-				        // ignored
-				    }
-
-				    _channels.Remove(key);
-					channel = null;
-				}
-			}
-
-			return channel;
-		}
-
-		public void Dispose()
-		{
-			lock (DisposeLock)
-			{
-				foreach (var value in _channels.Values)
-				{
-					if (value.Model != null)
-					{
-						if (value.Model.IsOpen)
-						{
-							value.Model.Close();
-						}
-
-						try
-						{
-							value.Model.Dispose();
-						}
-					    catch (Exception)
-					    {
-					        // ignored
-					    }
-					}
-
-					try
-					{
-						value.Dispose();
-					}
-				    catch (Exception)
-				    {
-				        // ignored
-				    }
-				}
-
-				_channels.Clear();
-
-				if (_connection != null)
-				{
-					if (_connection.IsOpen)
-					{
-						_connection.Close(_configuration.ConnectionCloseTimeoutMilliseconds);
-					}
-
-					try
-					{
-						_connection.Dispose();
-					}
-				    catch (Exception)
-				    {
-				        // ignored
-				    }
-
-				    _connection = null;
-				}
-			}
-		}
-
-		public void Acknowledge(object acknowledgementToken)
-		{
-			AccessQueue(() => GetChannel().Acknowledge((BasicDeliverEventArgs) acknowledgementToken));
-		}
-
-		public void Release(object acknowledgementToken)
-		{
-			AccessQueue(() =>
-			{
-				var basicDeliverEventArgs = (BasicDeliverEventArgs) acknowledgementToken;
-
-				GetChannel()
-					.Model.BasicPublish("", _parser.Queue, false, basicDeliverEventArgs.BasicProperties, basicDeliverEventArgs.Body);
-				GetChannel().Acknowledge(basicDeliverEventArgs);
-			});
-		}
-
-		public void Purge()
-		{
-			AccessQueue(() => { GetChannel().Model.QueuePurge(_parser.Queue); });
-		}
-
-		private void AccessQueue(Action action, int retry = 0)
-		{
-			try
-			{
-				action.Invoke();
-			}
-			catch (ConnectionException)
-			{
-				if (retry == 3)
-				{
-					throw;
-				}
-
-				Dispose();
-
-				AccessQueue(action, retry + 1);
-			}
-		}
-
-		private T AccessQueue<T>(Func<T> action, int retry = 0)
-		{
-			try
-			{
-				return action.Invoke();
-			}
-			catch (ConnectionException)
-			{
-				if (retry == 3)
-				{
-					throw;
-				}
-
-				Dispose();
-
-				return AccessQueue(action, retry + 1);
-			}
-		}
-	}
+            _factory = new ConnectionFactory
+            {
+                UserName = _parser.Username,
+                Password = _parser.Password,
+                HostName = _parser.Host,
+                VirtualHost = _parser.VirtualHost,
+                Port = _parser.Port,
+                RequestedHeartbeat = configuration.RequestedHeartbeat
+            };
+        }
+
+        public Uri Uri { get; }
+
+        public bool IsEmpty()
+        {
+            return AccessQueue(() =>
+            {
+                var result = GetChannel().Model.BasicGet(_parser.Queue, false);
+
+                if (result == null)
+                {
+                    return true;
+                }
+
+                GetChannel().Model.BasicReject(result.DeliveryTag, true);
+
+                return false;
+            });
+        }
+
+        public bool HasUserInfo => !string.IsNullOrEmpty(_parser.Username) && !string.IsNullOrEmpty(_parser.Password);
+
+        public void Enqueue(TransportMessage transportMessage, Stream stream)
+        {
+            Guard.AgainstNull(transportMessage, "transportMessage");
+            Guard.AgainstNull(stream, "stream");
+
+            if (transportMessage.HasExpired())
+            {
+                return;
+            }
+
+            AccessQueue(() =>
+            {
+                var model = GetChannel().Model;
+
+                var properties = model.CreateBasicProperties();
+
+                properties.Persistent = _parser.Persistent;
+                properties.CorrelationId = transportMessage.MessageId.ToString();
+
+                if (transportMessage.HasExpiryDate())
+                {
+                    var milliseconds = (long)(transportMessage.ExpiryDate - DateTime.Now).TotalMilliseconds;
+
+                    if (milliseconds < 1)
+                    {
+                        return;
+                    }
+
+                    properties.Expiration = milliseconds.ToString();
+                }
+
+                model.BasicPublish("", _parser.Queue, false, properties, stream.ToBytes());
+            });
+        }
+
+        public ReceivedMessage GetMessage()
+        {
+            return AccessQueue(() =>
+            {
+                var result = GetChannel().Next();
+
+                if (result == null)
+                {
+                    return null;
+                }
+
+                return new ReceivedMessage(new MemoryStream(result.Body), result);
+            });
+        }
+
+        public void Drop()
+        {
+            AccessQueue(() => { GetChannel().Model.QueueDelete(_parser.Queue); });
+        }
+
+        public void Create()
+        {
+            AccessQueue(() => QueueDeclare(GetChannel().Model));
+        }
+
+        private void QueueDeclare(IModel model)
+        {
+            model.QueueDeclare(_parser.Queue, _parser.Durable, false, false, null);
+        }
+
+        private IConnection GetConnection()
+        {
+            if (_connection != null && _connection.IsOpen)
+            {
+                return _connection;
+            }
+
+            lock (ConnectionLock)
+            {
+                if (_connection != null && !_connection.IsOpen)
+                {
+                    try
+                    {
+                        _connection.Dispose();
+                    }
+                    catch (Exception)
+                    {
+                        // ignored
+                    }
+
+                    _connection = null;
+                }
+
+                if (_connection == null)
+                {
+                    _connection = _factory.CreateConnection();
+                }
+
+                _connection.AutoClose = false;
+            }
+
+            return _connection;
+        }
+
+        private Channel GetChannel()
+        {
+            var key = Thread.CurrentThread.ManagedThreadId;
+
+            var channel = FindChannel(key);
+
+            if (channel != null)
+            {
+                return channel;
+            }
+
+            lock (QueueLock)
+            {
+                channel = FindChannel(key);
+
+                if (channel != null)
+                {
+                    return channel;
+                }
+
+                var retry = 0;
+                IConnection connection = null;
+
+                while (connection == null && retry < _operationRetryCount)
+                {
+                    try
+                    {
+                        connection = GetConnection();
+                    }
+                    catch (Exception)
+                    {
+                        retry++;
+                    }
+                }
+
+                if (connection == null)
+                {
+                    throw new ConnectionException(string.Format(Resources.ConnectionException, Uri.Secured()));
+                }
+
+                var model = connection.CreateModel();
+
+                model.BasicQos(0,
+                    (ushort)(_parser.PrefetchCount == 0 ? _configuration.DefaultPrefetchCount : _parser.PrefetchCount), false);
+
+                QueueDeclare(model);
+
+                channel = new Channel(model, _parser, _configuration);
+
+                _channels.Add(key, channel);
+
+                return channel;
+            }
+        }
+
+        private Channel FindChannel(int key)
+        {
+            Channel channel = null;
+
+            if (_channels.ContainsKey(key))
+            {
+                channel = _channels[key];
+
+                if (!channel.Model.IsOpen)
+                {
+                    try
+                    {
+                        channel.Dispose();
+                    }
+                    catch (Exception)
+                    {
+                        // ignored
+                    }
+
+                    _channels.Remove(key);
+                    channel = null;
+                }
+            }
+
+            return channel;
+        }
+
+        public void Dispose()
+        {
+            lock (DisposeLock)
+            {
+                foreach (var value in _channels.Values)
+                {
+                    if (value.Model != null)
+                    {
+                        if (value.Model.IsOpen)
+                        {
+                            value.Model.Close();
+                        }
+
+                        try
+                        {
+                            value.Model.Dispose();
+                        }
+                        catch (Exception)
+                        {
+                            // ignored
+                        }
+                    }
+
+                    try
+                    {
+                        value.Dispose();
+                    }
+                    catch (Exception)
+                    {
+                        // ignored
+                    }
+                }
+
+                _channels.Clear();
+
+                if (_connection != null)
+                {
+                    if (_connection.IsOpen)
+                    {
+                        _connection.Close(_configuration.ConnectionCloseTimeoutMilliseconds);
+                    }
+
+                    try
+                    {
+                        _connection.Dispose();
+                    }
+                    catch (Exception)
+                    {
+                        // ignored
+                    }
+
+                    _connection = null;
+                }
+            }
+        }
+
+        public void Acknowledge(object acknowledgementToken)
+        {
+            AccessQueue(() => GetChannel().Acknowledge((BasicDeliverEventArgs)acknowledgementToken));
+        }
+
+        public void Release(object acknowledgementToken)
+        {
+            AccessQueue(() =>
+            {
+                var basicDeliverEventArgs = (BasicDeliverEventArgs)acknowledgementToken;
+
+                GetChannel()
+                    .Model.BasicPublish("", _parser.Queue, false, basicDeliverEventArgs.BasicProperties, basicDeliverEventArgs.Body);
+                GetChannel().Acknowledge(basicDeliverEventArgs);
+            });
+        }
+
+        public void Purge()
+        {
+            AccessQueue(() => { GetChannel().Model.QueuePurge(_parser.Queue); });
+        }
+
+        private void AccessQueue(Action action, int retry = 0)
+        {
+            try
+            {
+                action.Invoke();
+            }
+            catch (ConnectionException)
+            {
+                if (retry == 3)
+                {
+                    throw;
+                }
+
+                Dispose();
+
+                AccessQueue(action, retry + 1);
+            }
+        }
+
+        private T AccessQueue<T>(Func<T> action, int retry = 0)
+        {
+            try
+            {
+                return action.Invoke();
+            }
+            catch (ConnectionException)
+            {
+                if (retry == 3)
+                {
+                    throw;
+                }
+
+                Dispose();
+
+                return AccessQueue(action, retry + 1);
+            }
+        }
+    }
 }
