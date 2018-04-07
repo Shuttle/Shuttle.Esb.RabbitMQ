@@ -232,12 +232,8 @@ namespace Shuttle.Esb.RabbitMQ
 
         private Channel FindChannel(int key)
         {
-            Channel channel = null;
-
-            if (_channels.ContainsKey(key))
+            if (_channels.TryGetValue(key, out var channel))
             {
-                channel = _channels[key];
-
                 if (!channel.Model.IsOpen)
                 {
                     try
