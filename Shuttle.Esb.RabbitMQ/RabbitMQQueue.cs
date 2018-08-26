@@ -168,8 +168,6 @@ namespace Shuttle.Esb.RabbitMQ
                 {
                     _connection = _factory.CreateConnection();
                 }
-
-                _connection.AutoClose = false;
             }
 
             return _connection;
