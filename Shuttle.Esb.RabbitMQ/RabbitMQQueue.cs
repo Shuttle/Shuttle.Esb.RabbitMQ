@@ -107,6 +107,11 @@ namespace Shuttle.Esb.RabbitMQ
                     properties.Expiration = milliseconds.ToString();
                 }
 
+                if (transportMessage.HasPriority())
+                {
+                    properties.Priority = (byte)transportMessage.Priority;
+                }
+
                 model.BasicPublish("", _parser.Queue, false, properties, stream.ToBytes());
             });
         }
