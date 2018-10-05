@@ -51,7 +51,7 @@ namespace Shuttle.Esb.RabbitMQ
                 HostName = _parser.Host,
                 VirtualHost = _parser.VirtualHost,
                 Port = _parser.Port,
-                RequestedHeartbeat = configuration.RequestedHeartbeat
+                RequestedHeartbeat = configuration.RequestedHeartbeat,
             };
         }
 
@@ -143,7 +143,14 @@ namespace Shuttle.Esb.RabbitMQ
 
         private void QueueDeclare(IModel model)
         {
-            model.QueueDeclare(_parser.Queue, _parser.Durable, false, false, null);
+            Dictionary<string, object> arguments = null;
+            if (_parser.Priority != 0)
+            {
+                arguments = new Dictionary<string, object>();
+                arguments.Add("x-max-priority", _parser.Priority);
+            }
+
+            model.QueueDeclare(_parser.Queue, _parser.Durable, false, false, arguments);
         }
 
         private IConnection GetConnection()

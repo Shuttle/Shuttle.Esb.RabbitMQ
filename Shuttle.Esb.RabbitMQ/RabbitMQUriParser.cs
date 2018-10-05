@@ -72,12 +72,14 @@ namespace Shuttle.Esb.RabbitMQ
 
             SetPrefetchCount(queryString);
             SetDurability(queryString);
+            SetPriority(queryString);
             SetPersistent(queryString);
         }
 
         public Uri Uri { get; }
         public bool Local { get; }
         public bool Durable { get; private set; }
+        public int Priority { get; private set; }
         public bool Persistent { get; private set; }
 
         public int PrefetchCount { get; private set; }
@@ -119,6 +121,23 @@ namespace Shuttle.Esb.RabbitMQ
             if (bool.TryParse(parameter, out var result))
             {
                 Durable = result;
+            }
+        }
+
+        private void SetPriority(QueryString queryString)
+        {
+            Priority = 0;
+
+            var parameter = queryString["priority"];
+
+            if (parameter == null)
+            {
+                return;
+            }
+
+            if (int.TryParse(parameter, out var result))
+            {
+                Priority = result;
             }
         }
 
