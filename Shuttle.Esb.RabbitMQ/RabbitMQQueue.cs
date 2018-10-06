@@ -107,6 +107,11 @@ namespace Shuttle.Esb.RabbitMQ
                     properties.Expiration = milliseconds.ToString();
                 }
 
+                if (transportMessage.HasPriority())
+                {
+                    properties.Priority = (byte)transportMessage.Priority;
+                }
+
                 model.BasicPublish("", _parser.Queue, false, properties, stream.ToBytes());
             });
         }
@@ -138,7 +143,14 @@ namespace Shuttle.Esb.RabbitMQ
 
         private void QueueDeclare(IModel model)
         {
-            model.QueueDeclare(_parser.Queue, _parser.Durable, false, false, null);
+            Dictionary<string, object> arguments = null;
+            if (_parser.Priority != 0)
+            {
+                arguments = new Dictionary<string, object>();
+                arguments.Add("x-max-priority", _parser.Priority);
+            }
+
+            model.QueueDeclare(_parser.Queue, _parser.Durable, false, false, arguments);
         }
 
         private IConnection GetConnection()
