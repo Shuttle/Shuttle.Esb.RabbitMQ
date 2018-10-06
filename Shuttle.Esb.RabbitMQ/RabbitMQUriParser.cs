@@ -79,7 +79,7 @@ namespace Shuttle.Esb.RabbitMQ
         public Uri Uri { get; }
         public bool Local { get; }
         public bool Durable { get; private set; }
-        public int Priority { get; private set; }
+        public byte Priority { get; private set; }
         public bool Persistent { get; private set; }
 
         public int PrefetchCount { get; private set; }
@@ -135,7 +135,7 @@ namespace Shuttle.Esb.RabbitMQ
                 return;
             }
 
-            if (int.TryParse(parameter, out var result))
+            if (byte.TryParse(parameter, out var result))
             {
                 Priority = result;
             }

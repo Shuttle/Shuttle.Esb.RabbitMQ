@@ -25,6 +25,7 @@ namespace Shuttle.Esb.RabbitMQ
         private volatile IConnection _connection;
 
         private readonly Dictionary<int, Channel> _channels = new Dictionary<int, Channel>();
+        private readonly Dictionary<string, object> _arguments = new Dictionary<string, object>();
 
         public RabbitMQQueue(Uri uri, IRabbitMQConfiguration configuration)
         {
@@ -35,6 +36,10 @@ namespace Shuttle.Esb.RabbitMQ
 
             Uri = _parser.Uri;
 
+            if (_parser.Priority != 0)
+            {
+                _arguments.Add("x-max-priority", _parser.Priority);
+            }
             _configuration = configuration;
 
             _operationRetryCount = _configuration.OperationRetryCount;
@@ -109,6 +114,11 @@ namespace Shuttle.Esb.RabbitMQ
 
                 if (transportMessage.HasPriority())
                 {
+                    if (transportMessage.Priority > 255)
+                    {
+                        transportMessage.Priority = 255;
+                    }
+
                     properties.Priority = (byte)transportMessage.Priority;
                 }
 
@@ -143,14 +153,7 @@ namespace Shuttle.Esb.RabbitMQ
 
         private void QueueDeclare(IModel model)
         {
-            Dictionary<string, object> arguments = null;
-            if (_parser.Priority != 0)
-            {
-                arguments = new Dictionary<string, object>();
-                arguments.Add("x-max-priority", _parser.Priority);
-            }
-
-            model.QueueDeclare(_parser.Queue, _parser.Durable, false, false, arguments);
+            model.QueueDeclare(_parser.Queue, _parser.Durable, false, false, _arguments);
         }
 
         private IConnection GetConnection()
