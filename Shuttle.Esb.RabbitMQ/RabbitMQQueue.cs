@@ -38,7 +38,7 @@ namespace Shuttle.Esb.RabbitMQ
 
             if (_parser.Priority != 0)
             {
-                _arguments.Add("x-max-priority", _parser.Priority);
+                _arguments.Add("x-max-priority", (int) _parser.Priority);
             }
             _configuration = configuration;
 
