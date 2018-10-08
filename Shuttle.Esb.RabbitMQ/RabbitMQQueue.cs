@@ -40,6 +40,7 @@ namespace Shuttle.Esb.RabbitMQ
             {
                 _arguments.Add("x-max-priority", (int) _parser.Priority);
             }
+
             _configuration = configuration;
 
             _operationRetryCount = _configuration.OperationRetryCount;
