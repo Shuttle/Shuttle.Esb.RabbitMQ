@@ -123,7 +123,27 @@ namespace Shuttle.Esb.RabbitMQ
                     properties.Priority = (byte)transportMessage.Priority;
                 }
 
-                model.BasicPublish("", _parser.Queue, false, properties, stream.ToBytes());
+                byte[] data;
+                if (stream is MemoryStream)
+                {
+                    var ms = (MemoryStream) stream;
+                    data = ms.GetBuffer();
+                    int length = (int) ms.Position;
+
+                    if (data.Length != length)
+                    {
+                        // we can't use any buffer pool since Rabbit needs the exact size buffer, so copy the data to a new array
+                        var newData = new byte[length];
+                        Buffer.BlockCopy(data, 0, newData, 0, length);
+                        data = newData;
+                    }
+                }
+                else
+                {
+                    data = stream.ToBytes();
+                }
+
+                model.BasicPublish("", _parser.Queue, false, properties, data);
             });
         }
 
