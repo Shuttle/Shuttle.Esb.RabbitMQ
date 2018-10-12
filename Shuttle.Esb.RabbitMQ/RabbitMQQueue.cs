@@ -130,7 +130,7 @@ namespace Shuttle.Esb.RabbitMQ
                     if (ms.TryGetBuffer(out var segment))
                     {
                         data = segment.Array;
-                        int length = (int) ms.Position;
+                        int length = (int) ms.Length;
 
                         if (segment.Offset != 0 || data.Length != length)
                         {
