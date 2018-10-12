@@ -158,7 +158,8 @@ namespace Shuttle.Esb.RabbitMQ
                     return null;
                 }
 
-                return new ReceivedMessage(new MemoryStream(result.Body), result);
+                var body = result.Body;
+                return new ReceivedMessage(new MemoryStream(body, 0, body.Length, false, true), result);
             });
         }
 
