@@ -11,21 +11,20 @@ namespace Shuttle.Esb.RabbitMQ
 {
     public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IDisposable, IPurgeQueue
     {
-        private readonly IRabbitMQConfiguration _configuration;
-
         private static readonly object ConnectionLock = new object();
         private static readonly object QueueLock = new object();
         private static readonly object DisposeLock = new object();
+        private readonly Dictionary<string, object> _arguments = new Dictionary<string, object>();
+
+        private readonly Dictionary<int, Channel> _channels = new Dictionary<int, Channel>();
+        private readonly IRabbitMQConfiguration _configuration;
+
+        private readonly ConnectionFactory _factory;
 
         private readonly int _operationRetryCount;
 
         private readonly RabbitMQUriParser _parser;
-
-        private readonly ConnectionFactory _factory;
         private volatile IConnection _connection;
-
-        private readonly Dictionary<int, Channel> _channels = new Dictionary<int, Channel>();
-        private readonly Dictionary<string, object> _arguments = new Dictionary<string, object>();
 
         public RabbitMQQueue(Uri uri, IRabbitMQConfiguration configuration)
         {
@@ -61,6 +60,79 @@ namespace Shuttle.Esb.RabbitMQ
             };
         }
 
+        public bool HasUserInfo => !string.IsNullOrEmpty(_parser.Username) && !string.IsNullOrEmpty(_parser.Password);
+
+        public void Create()
+        {
+            AccessQueue(() => QueueDeclare(GetChannel().Model));
+        }
+
+        public void Dispose()
+        {
+            lock (DisposeLock)
+            {
+                foreach (var value in _channels.Values)
+                {
+                    if (value.Model != null)
+                    {
+                        if (value.Model.IsOpen)
+                        {
+                            value.Model.Close();
+                        }
+
+                        try
+                        {
+                            value.Model.Dispose();
+                        }
+                        catch (Exception)
+                        {
+                            // ignored
+                        }
+                    }
+
+                    try
+                    {
+                        value.Dispose();
+                    }
+                    catch (Exception)
+                    {
+                        // ignored
+                    }
+                }
+
+                _channels.Clear();
+
+                if (_connection != null)
+                {
+                    if (_connection.IsOpen)
+                    {
+                        _connection.Close(_configuration.ConnectionCloseTimeoutMilliseconds);
+                    }
+
+                    try
+                    {
+                        _connection.Dispose();
+                    }
+                    catch (Exception)
+                    {
+                        // ignored
+                    }
+
+                    _connection = null;
+                }
+            }
+        }
+
+        public void Drop()
+        {
+            AccessQueue(() => { GetChannel().Model.QueueDelete(_parser.Queue); });
+        }
+
+        public void Purge()
+        {
+            AccessQueue(() => { GetChannel().Model.QueuePurge(_parser.Queue); });
+        }
+
         public Uri Uri { get; }
 
         public bool IsEmpty()
@@ -79,8 +151,6 @@ namespace Shuttle.Esb.RabbitMQ
                 return false;
             });
         }
-
-        public bool HasUserInfo => !string.IsNullOrEmpty(_parser.Username) && !string.IsNullOrEmpty(_parser.Password);
 
         public void Enqueue(TransportMessage transportMessage, Stream stream)
         {
@@ -103,7 +173,7 @@ namespace Shuttle.Esb.RabbitMQ
 
                 if (transportMessage.HasExpiryDate())
                 {
-                    var milliseconds = (long)(transportMessage.ExpiryDate - DateTime.Now).TotalMilliseconds;
+                    var milliseconds = (long) (transportMessage.ExpiryDate - DateTime.Now).TotalMilliseconds;
 
                     if (milliseconds < 1)
                     {
@@ -120,25 +190,23 @@ namespace Shuttle.Esb.RabbitMQ
                         transportMessage.Priority = 255;
                     }
 
-                    properties.Priority = (byte)transportMessage.Priority;
+                    properties.Priority = (byte) transportMessage.Priority;
                 }
 
                 byte[] data = null;
-                if (stream is MemoryStream)
-                {
-                    var ms = (MemoryStream) stream;
-                    if (ms.TryGetBuffer(out var segment))
-                    {
-                        data = segment.Array;
-                        int length = (int) ms.Length;
 
-                        if (segment.Offset != 0 || data.Length != length)
-                        {
-                            // we can't use any buffer pool since Rabbit needs the exact size buffer, so copy the data to a new array
-                            var newData = new byte[length];
-                            Buffer.BlockCopy(data, segment.Offset, newData, 0, length);
-                            data = newData;
-                        }
+                if (stream is MemoryStream ms && ms.TryGetBuffer(out var segment))
+                {
+                    data = segment.Array;
+
+                    var length = (int) ms.Length;
+
+                    if (segment.Offset != 0 || data.Length != length)
+                    {
+                        // we can't use any buffer pool since Rabbit needs the exact size buffer, so copy the data to a new array
+                        var destinationData = new byte[length];
+                        Buffer.BlockCopy(data, segment.Offset, destinationData, 0, length);
+                        data = destinationData;
                     }
                 }
 
@@ -167,14 +235,22 @@ namespace Shuttle.Esb.RabbitMQ
             });
         }
 
-        public void Drop()
+        public void Acknowledge(object acknowledgementToken)
         {
-            AccessQueue(() => { GetChannel().Model.QueueDelete(_parser.Queue); });
+            AccessQueue(() => GetChannel().Acknowledge((BasicDeliverEventArgs) acknowledgementToken));
         }
 
-        public void Create()
+        public void Release(object acknowledgementToken)
         {
-            AccessQueue(() => QueueDeclare(GetChannel().Model));
+            AccessQueue(() =>
+            {
+                var basicDeliverEventArgs = (BasicDeliverEventArgs) acknowledgementToken;
+
+                GetChannel()
+                    .Model.BasicPublish("", _parser.Queue, false, basicDeliverEventArgs.BasicProperties,
+                        basicDeliverEventArgs.Body);
+                GetChannel().Acknowledge(basicDeliverEventArgs);
+            });
         }
 
         private void QueueDeclare(IModel model)
@@ -257,7 +333,8 @@ namespace Shuttle.Esb.RabbitMQ
                 var model = connection.CreateModel();
 
                 model.BasicQos(0,
-                    (ushort)(_parser.PrefetchCount == 0 ? _configuration.DefaultPrefetchCount : _parser.PrefetchCount), false);
+                    (ushort) (_parser.PrefetchCount == 0 ? _configuration.DefaultPrefetchCount : _parser.PrefetchCount),
+                    false);
 
                 QueueDeclare(model);
 
@@ -290,84 +367,6 @@ namespace Shuttle.Esb.RabbitMQ
             }
 
             return channel;
-        }
-
-        public void Dispose()
-        {
-            lock (DisposeLock)
-            {
-                foreach (var value in _channels.Values)
-                {
-                    if (value.Model != null)
-                    {
-                        if (value.Model.IsOpen)
-                        {
-                            value.Model.Close();
-                        }
-
-                        try
-                        {
-                            value.Model.Dispose();
-                        }
-                        catch (Exception)
-                        {
-                            // ignored
-                        }
-                    }
-
-                    try
-                    {
-                        value.Dispose();
-                    }
-                    catch (Exception)
-                    {
-                        // ignored
-                    }
-                }
-
-                _channels.Clear();
-
-                if (_connection != null)
-                {
-                    if (_connection.IsOpen)
-                    {
-                        _connection.Close(_configuration.ConnectionCloseTimeoutMilliseconds);
-                    }
-
-                    try
-                    {
-                        _connection.Dispose();
-                    }
-                    catch (Exception)
-                    {
-                        // ignored
-                    }
-
-                    _connection = null;
-                }
-            }
-        }
-
-        public void Acknowledge(object acknowledgementToken)
-        {
-            AccessQueue(() => GetChannel().Acknowledge((BasicDeliverEventArgs)acknowledgementToken));
-        }
-
-        public void Release(object acknowledgementToken)
-        {
-            AccessQueue(() =>
-            {
-                var basicDeliverEventArgs = (BasicDeliverEventArgs)acknowledgementToken;
-
-                GetChannel()
-                    .Model.BasicPublish("", _parser.Queue, false, basicDeliverEventArgs.BasicProperties, basicDeliverEventArgs.Body);
-                GetChannel().Acknowledge(basicDeliverEventArgs);
-            });
-        }
-
-        public void Purge()
-        {
-            AccessQueue(() => { GetChannel().Model.QueuePurge(_parser.Queue); });
         }
 
         private void AccessQueue(Action action, int retry = 0)
