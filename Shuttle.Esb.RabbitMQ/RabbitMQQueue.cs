@@ -16,7 +16,9 @@ namespace Shuttle.Esb.RabbitMQ
         private static readonly object DisposeLock = new object();
         private readonly Dictionary<string, object> _arguments = new Dictionary<string, object>();
 
-        private readonly Dictionary<int, Channel> _channels = new Dictionary<int, Channel>();
+        [ThreadStatic]
+        private static Dictionary<RabbitMQQueue, Channel> _threadChannels;
+        private readonly HashSet<Channel> _channels = new HashSet<Channel>();
         private readonly IRabbitMQConfiguration _configuration;
 
         private readonly ConnectionFactory _factory;
@@ -71,7 +73,7 @@ namespace Shuttle.Esb.RabbitMQ
         {
             lock (DisposeLock)
             {
-                foreach (var value in _channels.Values)
+                foreach (var value in _channels)
                 {
                     if (value.Model != null)
                     {
@@ -101,6 +103,7 @@ namespace Shuttle.Esb.RabbitMQ
                 }
 
                 _channels.Clear();
+                _threadChannels?.Remove(this);
 
                 if (_connection != null)
                 {
@@ -267,6 +270,12 @@ namespace Shuttle.Esb.RabbitMQ
 
             lock (ConnectionLock)
             {
+                // double checked locking
+                if (_connection != null && _connection.IsOpen)
+                {
+                    return _connection;
+                }
+
                 if (_connection != null && !_connection.IsOpen)
                 {
                     try
@@ -292,78 +301,71 @@ namespace Shuttle.Esb.RabbitMQ
 
         private Channel GetChannel()
         {
-            var key = Thread.CurrentThread.ManagedThreadId;
+            if (_threadChannels == null)
+            {
+                _threadChannels = new Dictionary<RabbitMQQueue, Channel>();
+            }
 
-            var channel = FindChannel(key);
+            if (_threadChannels.TryGetValue(this, out var channel) && channel.Model.IsOpen)
+            {
+                return channel;
+            }
 
             if (channel != null)
             {
-                return channel;
+                // existing channel is not open
+                try
+                {
+                    channel.Dispose();
+                }
+                catch (Exception)
+                {
+                    // ignored
+                }
+
+                _threadChannels.Remove(this);
+                lock (QueueLock)
+                {
+                    _channels.Remove(channel);
+                }
             }
+
+
+            var retry = 0;
+            IConnection connection = null;
+
+            while (connection == null && retry < _operationRetryCount)
+            {
+                try
+                {
+                    connection = GetConnection();
+                }
+                catch (Exception)
+                {
+                    retry++;
+                }
+            }
+
+            if (connection == null)
+            {
+                throw new ConnectionException(string.Format(Resources.ConnectionException, Uri.Secured()));
+            }
+
+            var model = connection.CreateModel();
+
+            model.BasicQos(0,
+                (ushort) (_parser.PrefetchCount == 0 ? _configuration.DefaultPrefetchCount : _parser.PrefetchCount),
+                false);
+
+            QueueDeclare(model);
+
+            channel = new Channel(model, _parser, _configuration);
+
+            _threadChannels.Add(this, channel);
 
             lock (QueueLock)
             {
-                channel = FindChannel(key);
-
-                if (channel != null)
-                {
-                    return channel;
-                }
-
-                var retry = 0;
-                IConnection connection = null;
-
-                while (connection == null && retry < _operationRetryCount)
-                {
-                    try
-                    {
-                        connection = GetConnection();
-                    }
-                    catch (Exception)
-                    {
-                        retry++;
-                    }
-                }
-
-                if (connection == null)
-                {
-                    throw new ConnectionException(string.Format(Resources.ConnectionException, Uri.Secured()));
-                }
-
-                var model = connection.CreateModel();
-
-                model.BasicQos(0,
-                    (ushort) (_parser.PrefetchCount == 0 ? _configuration.DefaultPrefetchCount : _parser.PrefetchCount),
-                    false);
-
-                QueueDeclare(model);
-
-                channel = new Channel(model, _parser, _configuration);
-
-                _channels.Add(key, channel);
-
-                return channel;
-            }
-        }
-
-        private Channel FindChannel(int key)
-        {
-            if (_channels.TryGetValue(key, out var channel))
-            {
-                if (!channel.Model.IsOpen)
-                {
-                    try
-                    {
-                        channel.Dispose();
-                    }
-                    catch (Exception)
-                    {
-                        // ignored
-                    }
-
-                    _channels.Remove(key);
-                    channel = null;
-                }
+                _channels.Add(channel);
             }
 
             return channel;
