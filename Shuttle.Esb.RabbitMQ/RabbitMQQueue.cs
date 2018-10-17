@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Threading;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using Shuttle.Core.Contract;
@@ -13,11 +12,10 @@ namespace Shuttle.Esb.RabbitMQ
     {
         private static readonly object ConnectionLock = new object();
         private static readonly object QueueLock = new object();
-        private static readonly object DisposeLock = new object();
-        private readonly Dictionary<string, object> _arguments = new Dictionary<string, object>();
 
-        [ThreadStatic]
-        private static Dictionary<RabbitMQQueue, Channel> _threadChannels;
+        [ThreadStatic] private static Dictionary<RabbitMQQueue, Channel> _threadChannels;
+
+        private readonly Dictionary<string, object> _arguments = new Dictionary<string, object>();
         private readonly HashSet<Channel> _channels = new HashSet<Channel>();
         private readonly IRabbitMQConfiguration _configuration;
 
@@ -71,58 +69,55 @@ namespace Shuttle.Esb.RabbitMQ
 
         public void Dispose()
         {
-            lock (DisposeLock)
+            foreach (var value in _channels)
             {
-                foreach (var value in _channels)
+                if (value.Model != null)
                 {
-                    if (value.Model != null)
+                    if (value.Model.IsOpen)
                     {
-                        if (value.Model.IsOpen)
-                        {
-                            value.Model.Close();
-                        }
-
-                        try
-                        {
-                            value.Model.Dispose();
-                        }
-                        catch (Exception)
-                        {
-                            // ignored
-                        }
+                        value.Model.Close();
                     }
 
                     try
                     {
-                        value.Dispose();
+                        value.Model.Dispose();
                     }
-                    catch (Exception)
+                    catch
                     {
                         // ignored
                     }
                 }
 
-                _channels.Clear();
-                _threadChannels?.Remove(this);
-
-                if (_connection != null)
+                try
                 {
-                    if (_connection.IsOpen)
-                    {
-                        _connection.Close(_configuration.ConnectionCloseTimeoutMilliseconds);
-                    }
-
-                    try
-                    {
-                        _connection.Dispose();
-                    }
-                    catch (Exception)
-                    {
-                        // ignored
-                    }
-
-                    _connection = null;
+                    value.Dispose();
                 }
+                catch 
+                {
+                    // ignored
+                }
+            }
+
+            _channels.Clear();
+            _threadChannels?.Remove(this);
+
+            if (_connection != null)
+            {
+                if (_connection.IsOpen)
+                {
+                    _connection.Close(_configuration.ConnectionCloseTimeoutMilliseconds);
+                }
+
+                try
+                {
+                    _connection.Dispose();
+                }
+                catch 
+                {
+                    // ignored
+                }
+
+                _connection = null;
             }
         }
 
@@ -282,7 +277,7 @@ namespace Shuttle.Esb.RabbitMQ
                     {
                         _connection.Dispose();
                     }
-                    catch (Exception)
+                    catch 
                     {
                         // ignored
                     }
@@ -318,7 +313,7 @@ namespace Shuttle.Esb.RabbitMQ
                 {
                     channel.Dispose();
                 }
-                catch (Exception)
+                catch
                 {
                     // ignored
                 }
@@ -340,7 +335,7 @@ namespace Shuttle.Esb.RabbitMQ
                 {
                     connection = GetConnection();
                 }
-                catch (Exception)
+                catch 
                 {
                     retry++;
                 }
