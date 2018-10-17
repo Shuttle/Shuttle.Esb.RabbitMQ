@@ -215,7 +215,7 @@ namespace Shuttle.Esb.RabbitMQ
                     data = stream.ToBytes();
                 }
 
-                model.BasicPublish("", _parser.Queue, false, properties, data);
+                model.BasicPublish(string.Empty, _parser.Queue, false, properties, data);
             });
         }
 
