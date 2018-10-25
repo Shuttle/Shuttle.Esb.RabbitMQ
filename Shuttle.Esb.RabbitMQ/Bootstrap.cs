@@ -7,7 +7,7 @@ namespace Shuttle.Esb.RabbitMQ
     {
         public void Register(IComponentRegistry registry)
         {
-            Guard.AgainstNull(registry, "registry");
+            Guard.AgainstNull(registry, nameof(registry));
 
             if (!registry.IsRegistered<IRabbitMQConfiguration>())
             {

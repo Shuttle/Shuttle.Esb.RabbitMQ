@@ -11,7 +11,7 @@ namespace Shuttle.Esb.RabbitMQ
 
         public RabbitMQUriParser(Uri uri)
         {
-            Guard.AgainstNull(uri, "uri");
+            Guard.AgainstNull(uri, nameof(uri));
 
             if (!uri.Scheme.Equals(Scheme, StringComparison.InvariantCultureIgnoreCase))
             {
@@ -74,6 +74,7 @@ namespace Shuttle.Esb.RabbitMQ
             SetDurability(queryString);
             SetPriority(queryString);
             SetPersistent(queryString);
+            SetName(queryString);
         }
 
         public Uri Uri { get; }
@@ -81,6 +82,7 @@ namespace Shuttle.Esb.RabbitMQ
         public bool Durable { get; private set; }
         public byte Priority { get; private set; }
         public bool Persistent { get; private set; }
+        public string Name { get; private set; }
 
         public int PrefetchCount { get; private set; }
         public string Username { get; }
@@ -156,6 +158,11 @@ namespace Shuttle.Esb.RabbitMQ
             {
                 Persistent = result;
             }
+        }
+
+        private void SetName(QueryString parameters)
+        {
+            Name = parameters["name"];
         }
     }
 }

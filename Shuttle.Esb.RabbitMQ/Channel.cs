@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using RabbitMQ.Client.MessagePatterns;
@@ -6,7 +7,7 @@ using Shuttle.Core.Contract;
 
 namespace Shuttle.Esb.RabbitMQ
 {
-    internal class Channel : IDisposable
+    internal sealed class Channel : IDisposable
     {
         private readonly string _queue;
         private Subscription _subscription;
@@ -14,9 +15,9 @@ namespace Shuttle.Esb.RabbitMQ
 
         public Channel(IModel model, RabbitMQUriParser parser, IRabbitMQConfiguration configuration)
         {
-            Guard.AgainstNull(model, "model");
-            Guard.AgainstNull(parser, "parser");
-            Guard.AgainstNull(configuration, "configuration");
+            Guard.AgainstNull(model, nameof(model));
+            Guard.AgainstNull(parser, nameof(parser));
+            Guard.AgainstNull(configuration, nameof(configuration));
 
             Model = model;
 
@@ -56,12 +57,19 @@ namespace Shuttle.Esb.RabbitMQ
 
         public void Dispose()
         {
-            if (Model.IsOpen)
+            try
             {
-                Model.Close();
-            }
+                if (Model.IsOpen)
+                {
+                    Model.Close();
+                }
 
-            Model.Dispose();
+                Model.Dispose();
+            }
+            catch
+            {
+                // ignored
+            }
         }
     }
 }
