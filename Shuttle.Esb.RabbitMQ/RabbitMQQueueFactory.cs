@@ -16,14 +16,14 @@ namespace Shuttle.Esb.RabbitMQ
 
         public IQueue Create(Uri uri)
         {
-            Guard.AgainstNull(uri, "uri");
+            Guard.AgainstNull(uri, nameof(uri));
 
             return new RabbitMQQueue(uri, Configuration);
         }
 
         public bool CanCreate(Uri uri)
         {
-            Guard.AgainstNull(uri, "uri");
+            Guard.AgainstNull(uri, nameof(uri));
 
             return Scheme.Equals(uri.Scheme, StringComparison.InvariantCultureIgnoreCase);
         }

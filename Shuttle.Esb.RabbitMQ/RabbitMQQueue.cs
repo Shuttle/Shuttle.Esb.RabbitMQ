@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.CompilerServices;
+using System.Threading;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using Shuttle.Core.Contract;
@@ -13,12 +15,13 @@ namespace Shuttle.Esb.RabbitMQ
         private static readonly object ConnectionLock = new object();
         private static readonly object QueueLock = new object();
 
-        [ThreadStatic] private static Dictionary<RabbitMQQueue, Channel> _threadChannels;
+        [ThreadStatic] private static ConditionalWeakTable<IConnection, Channel> _threadChannels;
 
         private readonly Dictionary<string, object> _arguments = new Dictionary<string, object>();
-        private readonly HashSet<Channel> _channels = new HashSet<Channel>();
+        private readonly Dictionary<Channel, WeakReference<Thread>> _channels = new Dictionary<Channel, WeakReference<Thread>>();
+        private readonly List<Channel> _channelsToRemove = new List<Channel>();
         private readonly IRabbitMQConfiguration _configuration;
-
+        
         private readonly ConnectionFactory _factory;
 
         private readonly int _operationRetryCount;
@@ -28,8 +31,8 @@ namespace Shuttle.Esb.RabbitMQ
 
         public RabbitMQQueue(Uri uri, IRabbitMQConfiguration configuration)
         {
-            Guard.AgainstNull(uri, "uri");
-            Guard.AgainstNull(configuration, "configuration");
+            Guard.AgainstNull(uri, nameof(uri));
+            Guard.AgainstNull(configuration, nameof(configuration));
 
             _parser = new RabbitMQUriParser(uri);
 
@@ -69,55 +72,41 @@ namespace Shuttle.Esb.RabbitMQ
 
         public void Dispose()
         {
-            foreach (var value in _channels)
+            CloseConnection();
+        }
+
+        private void CloseConnection()
+        {
+            lock (QueueLock)
             {
-                if (value.Model != null)
+                foreach (var channel in _channels.Keys)
                 {
-                    if (value.Model.IsOpen)
+                    channel.Dispose();
+                }
+
+                _channels.Clear();
+
+                lock (ConnectionLock)
+                {
+                    if (_connection != null)
                     {
-                        value.Model.Close();
+                        if (_connection.IsOpen)
+                        {
+                            _connection.Close(_configuration.ConnectionCloseTimeoutMilliseconds);
+                        }
+
+                        try
+                        {
+                            _connection.Dispose();
+                        }
+                        catch
+                        {
+                            // ignored
+                        }
+
+                        _connection = null;
                     }
-
-                    try
-                    {
-                        value.Model.Dispose();
-                    }
-                    catch
-                    {
-                        // ignored
-                    }
                 }
-
-                try
-                {
-                    value.Dispose();
-                }
-                catch 
-                {
-                    // ignored
-                }
-            }
-
-            _channels.Clear();
-            _threadChannels?.Remove(this);
-
-            if (_connection != null)
-            {
-                if (_connection.IsOpen)
-                {
-                    _connection.Close(_configuration.ConnectionCloseTimeoutMilliseconds);
-                }
-
-                try
-                {
-                    _connection.Dispose();
-                }
-                catch 
-                {
-                    // ignored
-                }
-
-                _connection = null;
             }
         }
 
@@ -152,8 +141,8 @@ namespace Shuttle.Esb.RabbitMQ
 
         public void Enqueue(TransportMessage transportMessage, Stream stream)
         {
-            Guard.AgainstNull(transportMessage, "transportMessage");
-            Guard.AgainstNull(stream, "stream");
+            Guard.AgainstNull(transportMessage, nameof(transportMessage));
+            Guard.AgainstNull(stream, nameof(stream));
 
             if (transportMessage.HasExpired())
             {
@@ -266,29 +255,18 @@ namespace Shuttle.Esb.RabbitMQ
             lock (ConnectionLock)
             {
                 // double checked locking
-                if (_connection != null && _connection.IsOpen)
+                if (_connection != null)
                 {
-                    return _connection;
-                }
-
-                if (_connection != null && !_connection.IsOpen)
-                {
-                    try
+                    if (_connection.IsOpen)
                     {
-                        _connection.Dispose();
-                    }
-                    catch 
-                    {
-                        // ignored
+                        return _connection;
                     }
 
-                    _connection = null;
+                    // close all channels and dispose the existing connection
+                    CloseConnection();
                 }
 
-                if (_connection == null)
-                {
-                    _connection = _factory.CreateConnection();
-                }
+                _connection = _factory.CreateConnection(_parser.Name);
             }
 
             return _connection;
@@ -298,10 +276,12 @@ namespace Shuttle.Esb.RabbitMQ
         {
             if (_threadChannels == null)
             {
-                _threadChannels = new Dictionary<RabbitMQQueue, Channel>();
+                _threadChannels = new ConditionalWeakTable<IConnection, Channel>();
             }
 
-            if (_threadChannels.TryGetValue(this, out var channel) && channel.Model.IsOpen)
+            var connection = _connection;
+            Channel channel = null;
+            if (connection != null && _threadChannels.TryGetValue(connection, out channel) && channel.Model.IsOpen)
             {
                 return channel;
             }
@@ -309,25 +289,12 @@ namespace Shuttle.Esb.RabbitMQ
             if (channel != null)
             {
                 // existing channel is not open
-                try
-                {
-                    channel.Dispose();
-                }
-                catch
-                {
-                    // ignored
-                }
-
-                _threadChannels.Remove(this);
-                lock (QueueLock)
-                {
-                    _channels.Remove(channel);
-                }
+                _threadChannels.Remove(connection);
+                channel.Dispose();
             }
-
-
+            
             var retry = 0;
-            IConnection connection = null;
+            connection = null;
 
             while (connection == null && retry < _operationRetryCount)
             {
@@ -356,11 +323,29 @@ namespace Shuttle.Esb.RabbitMQ
 
             channel = new Channel(model, _parser, _configuration);
 
-            _threadChannels.Add(this, channel);
+            _threadChannels.Add(connection, channel);
 
             lock (QueueLock)
             {
-                _channels.Add(channel);
+                _channels.Add(channel, new WeakReference<Thread>(Thread.CurrentThread));
+
+                // remove the dead channels
+                var channelsToRemove = _channelsToRemove;
+                foreach (var pair in _channels)
+                {
+                    if (!pair.Value.TryGetTarget(out _))
+                    {
+                        channelsToRemove.Add(pair.Key);
+                    }
+                }
+
+                foreach (var ch in channelsToRemove)
+                {
+                    _channels.Remove(ch);
+                    ch.Dispose();
+                }
+
+                _channelsToRemove.Clear();
             }
 
             return channel;
@@ -379,7 +364,7 @@ namespace Shuttle.Esb.RabbitMQ
                     throw;
                 }
 
-                Dispose();
+                CloseConnection();
 
                 AccessQueue(action, retry + 1);
             }
@@ -398,7 +383,7 @@ namespace Shuttle.Esb.RabbitMQ
                     throw;
                 }
 
-                Dispose();
+                CloseConnection();
 
                 return AccessQueue(action, retry + 1);
             }
