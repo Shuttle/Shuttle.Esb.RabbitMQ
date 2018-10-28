@@ -234,7 +234,7 @@ namespace Shuttle.Esb.RabbitMQ
                 var basicDeliverEventArgs = (BasicDeliverEventArgs) acknowledgementToken;
 
                 GetChannel()
-                    .Model.BasicPublish("", _parser.Queue, false, basicDeliverEventArgs.BasicProperties,
+                    .Model.BasicPublish(string.Empty, _parser.Queue, false, basicDeliverEventArgs.BasicProperties,
                         basicDeliverEventArgs.Body);
                 GetChannel().Acknowledge(basicDeliverEventArgs);
             });
@@ -339,10 +339,10 @@ namespace Shuttle.Esb.RabbitMQ
                     }
                 }
 
-                foreach (var ch in channelsToRemove)
+                foreach (var channelToRemove in channelsToRemove)
                 {
-                    _channels.Remove(ch);
-                    ch.Dispose();
+                    _channels.Remove(channelToRemove);
+                    channelToRemove.Dispose();
                 }
 
                 _channelsToRemove.Clear();
