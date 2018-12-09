@@ -31,7 +31,7 @@
         <dependency id="System.Configuration.ConfigurationManager" version="{System.Configuration.ConfigurationManager-version}" />
       </group>
 
-      <group targetFramework="netcoreapp2.0">
+      <group targetFramework="netcoreapp2.1">
         <dependency id="RabbitMQ.Client" version="{RabbitMQ.Client-version}" />
         <dependency id="Shuttle.Esb" version="{Shuttle.Esb-version}" />
         <dependency id="Shuttle.Core.Container" version="{Shuttle.Core.Container-version}" />
