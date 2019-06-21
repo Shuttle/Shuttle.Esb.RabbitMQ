@@ -14,9 +14,9 @@
 
     <ItemGroup>
         <PackageReference Include="RabbitMQ.Client" Version="5.1.0" />
-        <PackageReference Include="Shuttle.Core.Container" Version="10.0.9" />
+        <PackageReference Include="Shuttle.Core.Container" Version="11.0.0" />
         <PackageReference Include="Shuttle.Core.Uris" Version="10.0.4" />
-        <PackageReference Include="Shuttle.Esb" Version="10.1.6" />
+        <PackageReference Include="Shuttle.Esb" Version="11.0.0" />
         <PackageReference Include="System.Configuration.ConfigurationManager" Version="4.5.0" Condition="'$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'netcoreapp2.0' or '$(TargetFramework)' == 'netcoreapp2.1'" />
         <PackageReference Include="System.Configuration.ConfigurationManager" Version="4.5.0" />
     </ItemGroup>
