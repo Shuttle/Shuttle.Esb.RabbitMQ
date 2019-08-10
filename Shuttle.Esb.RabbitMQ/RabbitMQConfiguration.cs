@@ -10,6 +10,7 @@ namespace Shuttle.Esb.RabbitMQ
             ConnectionCloseTimeoutMilliseconds = 1000;
             OperationRetryCount = 3;
             DefaultPrefetchCount = 25;
+            UseBackgroundThreadsForIO = true;
         }
 
         public ushort RequestedHeartbeat { get; set; }
@@ -18,5 +19,6 @@ namespace Shuttle.Esb.RabbitMQ
         public int ConnectionCloseTimeoutMilliseconds { get; set; }
         public int OperationRetryCount { get; set; }
         public ushort DefaultPrefetchCount { get; set; }
+        public bool UseBackgroundThreadsForIO { get; set; }
     }
 }

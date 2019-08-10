@@ -59,7 +59,8 @@ namespace Shuttle.Esb.RabbitMQ
                 HostName = _parser.Host,
                 VirtualHost = _parser.VirtualHost,
                 Port = _parser.Port,
-                RequestedHeartbeat = configuration.RequestedHeartbeat
+                RequestedHeartbeat = configuration.RequestedHeartbeat,
+                UseBackgroundThreadsForIO = configuration.UseBackgroundThreadsForIO
             };
         }
 

@@ -23,6 +23,9 @@ namespace Shuttle.Esb.RabbitMQ
         [ConfigurationProperty("defaultPrefetchCount", IsRequired = false, DefaultValue = (ushort) 25)]
         public ushort DefaultPrefetchCount => (ushort) this["defaultPrefetchCount"];
 
+        [ConfigurationProperty("useBackgroundThreadsForIO", IsRequired = false, DefaultValue = true)]
+        public bool UseBackgroundThreadsForIO => (bool) this["useBackgroundThreadsForIO"];
+
         public static RabbitMQConfiguration Configuration()
         {
             var section = ConfigurationSectionProvider.Open<RabbitMQSection>("shuttle", "rabbitmq");
@@ -36,6 +39,7 @@ namespace Shuttle.Esb.RabbitMQ
                 configuration.ConnectionCloseTimeoutMilliseconds = section.ConnectionCloseTimeoutMilliseconds;
                 configuration.OperationRetryCount = section.OperationRetryCount;
                 configuration.DefaultPrefetchCount = section.DefaultPrefetchCount;
+                configuration.UseBackgroundThreadsForIO = section.UseBackgroundThreadsForIO;
             }
 
             return configuration;

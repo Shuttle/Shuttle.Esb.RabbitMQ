@@ -8,5 +8,6 @@ namespace Shuttle.Esb.RabbitMQ
         int ConnectionCloseTimeoutMilliseconds { get; set; }
         int OperationRetryCount { get; set; }
         ushort DefaultPrefetchCount { get; set; }
+        bool UseBackgroundThreadsForIO { get; set; }
     }
 }
