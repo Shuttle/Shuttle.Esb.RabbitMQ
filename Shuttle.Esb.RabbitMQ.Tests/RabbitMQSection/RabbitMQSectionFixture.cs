@@ -11,7 +11,7 @@ namespace Shuttle.Esb.RabbitMQ.Tests
         protected RabbitMQSection GetRabbitMQSection(string file)
         {
             return ConfigurationSectionProvider.OpenFile<RabbitMQSection>("shuttle", "rabbitmq",
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, string.Format(@".\RabbitMQSection\files\{0}", file)));
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $@".\RabbitMQSection\files\{file}"));
         }
 
         [Test]

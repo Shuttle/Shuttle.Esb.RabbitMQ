@@ -3,9 +3,15 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27130.2010
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shuttle.Esb.RabbitMQ", "Shuttle.Esb.RabbitMQ\Shuttle.Esb.RabbitMQ.csproj", "{859BA50B-FDDD-4FE2-9261-9A974B8954D4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Shuttle.Esb.RabbitMQ", "Shuttle.Esb.RabbitMQ\Shuttle.Esb.RabbitMQ.csproj", "{859BA50B-FDDD-4FE2-9261-9A974B8954D4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shuttle.Esb.RabbitMQ.Tests", "Shuttle.Esb.RabbitMQ.Tests\Shuttle.Esb.RabbitMQ.Tests.csproj", "{E3AA7ACB-7750-4321-B796-E71B0C68EBF1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Shuttle.Esb.RabbitMQ.Tests", "Shuttle.Esb.RabbitMQ.Tests\Shuttle.Esb.RabbitMQ.Tests.csproj", "{E3AA7ACB-7750-4321-B796-E71B0C68EBF1}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{80A5F602-B02D-4D5C-B9C4-092862296FD9}"
+	ProjectSection(SolutionItems) = preProject
+		LICENSE = LICENSE
+		README.md = README.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
