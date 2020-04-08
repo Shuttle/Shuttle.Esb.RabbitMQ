@@ -39,7 +39,7 @@ namespace Shuttle.Esb.RabbitMQ
             try
             {
                 var consumer = _consumer;
-                if (consumer != null && Model.IsClosed && _queue.TryTake(out var basicDeliverEventArgs, _millisecondsTimeout))
+                if (consumer != null && !Model.IsClosed && _queue.TryTake(out var basicDeliverEventArgs, _millisecondsTimeout))
                 {
                     if (basicDeliverEventArgs == null)
                     {
