@@ -1,8 +1,8 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-    <TargetFrameworks>net461;netstandard2.0;netcoreapp2.1</TargetFrameworks>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+        <TargetFrameworks>net461;netstandard2.0;netcoreapp2.1</TargetFrameworks>
+        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     </PropertyGroup>
 
     <ItemGroup>
@@ -13,7 +13,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="RabbitMQ.Client" Version="5.1.0" />
+        <PackageReference Include="RabbitMQ.Client" Version="6.0.0-rc.3" />
         <PackageReference Include="Shuttle.Core.Container" Version="11.0.0" />
         <PackageReference Include="Shuttle.Core.Uris" Version="10.0.4" />
         <PackageReference Include="Shuttle.Esb" Version="11.0.0" />

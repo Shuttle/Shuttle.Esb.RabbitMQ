@@ -1,11 +1,13 @@
+using System;
+
 namespace Shuttle.Esb.RabbitMQ
 {
     public interface IRabbitMQConfiguration
     {
-        ushort RequestedHeartbeat { get; set; }
+        TimeSpan RequestedHeartbeat { get; set; }
         int LocalQueueTimeoutMilliseconds { get; set; }
         int RemoteQueueTimeoutMilliseconds { get; set; }
-        int ConnectionCloseTimeoutMilliseconds { get; set; }
+        TimeSpan ConnectionCloseTimeout { get; set; }
         int OperationRetryCount { get; set; }
         ushort DefaultPrefetchCount { get; set; }
         bool UseBackgroundThreadsForIO { get; set; }

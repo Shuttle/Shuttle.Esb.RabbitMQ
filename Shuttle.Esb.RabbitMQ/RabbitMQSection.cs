@@ -1,4 +1,5 @@
-﻿using System.Configuration;
+﻿using System;
+using System.Configuration;
 using Shuttle.Core.Configuration;
 
 namespace Shuttle.Esb.RabbitMQ
@@ -33,10 +34,10 @@ namespace Shuttle.Esb.RabbitMQ
 
             if (section != null)
             {
-                configuration.RequestedHeartbeat = section.RequestedHeartbeat;
+                configuration.RequestedHeartbeat = TimeSpan.FromSeconds(section.RequestedHeartbeat);
                 configuration.LocalQueueTimeoutMilliseconds = section.LocalQueueTimeoutMilliseconds;
                 configuration.RemoteQueueTimeoutMilliseconds = section.RemoteQueueTimeoutMilliseconds;
-                configuration.ConnectionCloseTimeoutMilliseconds = section.ConnectionCloseTimeoutMilliseconds;
+                configuration.ConnectionCloseTimeout = TimeSpan.FromMilliseconds(section.ConnectionCloseTimeoutMilliseconds);
                 configuration.OperationRetryCount = section.OperationRetryCount;
                 configuration.DefaultPrefetchCount = section.DefaultPrefetchCount;
                 configuration.UseBackgroundThreadsForIO = section.UseBackgroundThreadsForIO;

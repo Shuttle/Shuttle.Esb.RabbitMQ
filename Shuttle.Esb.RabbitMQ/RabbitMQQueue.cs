@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -93,7 +94,7 @@ namespace Shuttle.Esb.RabbitMQ
                     {
                         if (_connection.IsOpen)
                         {
-                            _connection.Close(_configuration.ConnectionCloseTimeoutMilliseconds);
+                            _connection.Close(_configuration.ConnectionCloseTimeout);
                         }
 
                         try
@@ -219,7 +220,25 @@ namespace Shuttle.Esb.RabbitMQ
                 }
 
                 var body = result.Body;
-                return new ReceivedMessage(new MemoryStream(body, 0, body.Length, false, true), result);
+                byte[] data = null;
+                int offset = 0;
+                int length = 0;
+                
+                if (MemoryMarshal.TryGetArray(body, out var segment))
+                {
+                    data = segment.Array;
+                    offset = segment.Offset;
+                    length = segment.Count;
+                }
+
+                if (data == null)
+                {
+                    data = body.ToArray();
+                    offset = 0;
+                    length = data.Length;
+                }
+
+                return new ReceivedMessage(new MemoryStream(data, offset, length, false, true), result);
             });
         }
 
