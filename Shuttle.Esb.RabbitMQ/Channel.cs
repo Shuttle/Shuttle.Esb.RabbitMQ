@@ -11,8 +11,8 @@ namespace Shuttle.Esb.RabbitMQ
     {
         private readonly string _queueName;
         private volatile EventingBasicConsumer _consumer;
-        private readonly BlockingCollection<BasicDeliverEventArgs> _queue = 
-            new BlockingCollection<BasicDeliverEventArgs>(new ConcurrentQueue<BasicDeliverEventArgs>());
+        private readonly BlockingCollection<AcknowledgementToken> _queue = 
+            new BlockingCollection<AcknowledgementToken>(new ConcurrentQueue<AcknowledgementToken>());
         private readonly int _millisecondsTimeout;
 
         public Channel(IModel model, RabbitMQUriParser parser, IRabbitMQConfiguration configuration)
@@ -32,7 +32,7 @@ namespace Shuttle.Esb.RabbitMQ
 
         public IModel Model { get; }
 
-        public BasicDeliverEventArgs Next()
+        public AcknowledgementToken Next()
         {
             EnsureConsumer();
 
@@ -65,14 +65,24 @@ namespace Shuttle.Esb.RabbitMQ
             }
             
             _consumer = new EventingBasicConsumer(Model);
-            _consumer.Received += (sender, args) => _queue.Add(args); 
+            _consumer.Received += (sender, args) =>
+            {
+                // body should be copied, since it will be accessed later from another thread
+                var token = new AcknowledgementToken
+                {
+                    Data = args.Body.ToArray(),
+                    BasicProperties = args.BasicProperties,
+                    DeliveryTag = args.DeliveryTag,
+                };
+                _queue.Add(token);
+            }; 
             string consumerTag = Model.BasicConsume(_queueName, false, _consumer);
             _consumer.ConsumerCancelled += (sender, args) => _consumer = null;
         }
 
-        public void Acknowledge(BasicDeliverEventArgs basicDeliverEventArgs)
+        public void Acknowledge(AcknowledgementToken acknowledgementToken)
         {
-            if (basicDeliverEventArgs == null)
+            if (acknowledgementToken == null)
             {
                 return;
             }
@@ -80,7 +90,7 @@ namespace Shuttle.Esb.RabbitMQ
             EnsureConsumer();
             if (Model.IsOpen)
             {
-                Model.BasicAck(basicDeliverEventArgs.DeliveryTag, false);
+                Model.BasicAck(acknowledgementToken.DeliveryTag, false);
             }
         }
 

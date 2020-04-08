@@ -182,24 +182,14 @@ namespace Shuttle.Esb.RabbitMQ
                     properties.Priority = (byte) transportMessage.Priority;
                 }
 
-                byte[] data = null;
+                ReadOnlyMemory<byte> data;
 
                 if (stream is MemoryStream ms && ms.TryGetBuffer(out var segment))
                 {
-                    data = segment.Array;
-
                     var length = (int) ms.Length;
-
-                    if (segment.Offset != 0 || data.Length != length)
-                    {
-                        // we can't use any buffer pool since Rabbit needs the exact size buffer, so copy the data to a new array
-                        var destinationData = new byte[length];
-                        Buffer.BlockCopy(data, segment.Offset, destinationData, 0, length);
-                        data = destinationData;
-                    }
+                    data = new ReadOnlyMemory<byte>(segment.Array, segment.Offset, length);
                 }
-
-                if (data == null)
+                else
                 {
                     data = stream.ToBytes();
                 }
@@ -219,44 +209,26 @@ namespace Shuttle.Esb.RabbitMQ
                     return null;
                 }
 
-                var body = result.Body;
-                byte[] data = null;
-                int offset = 0;
-                int length = 0;
-                
-                if (MemoryMarshal.TryGetArray(body, out var segment))
-                {
-                    data = segment.Array;
-                    offset = segment.Offset;
-                    length = segment.Count;
-                }
-
-                if (data == null)
-                {
-                    data = body.ToArray();
-                    offset = 0;
-                    length = data.Length;
-                }
-
-                return new ReceivedMessage(new MemoryStream(data, offset, length, false, true), result);
+                var data = result.Data;
+                return new ReceivedMessage(new MemoryStream(data, 0, data.Length, false, true), result);
             });
         }
 
         public void Acknowledge(object acknowledgementToken)
         {
-            AccessQueue(() => GetChannel().Acknowledge((BasicDeliverEventArgs) acknowledgementToken));
+            AccessQueue(() => GetChannel().Acknowledge((AcknowledgementToken) acknowledgementToken));
         }
 
         public void Release(object acknowledgementToken)
         {
             AccessQueue(() =>
             {
-                var basicDeliverEventArgs = (BasicDeliverEventArgs) acknowledgementToken;
+                var token = (AcknowledgementToken) acknowledgementToken;
 
                 GetChannel()
-                    .Model.BasicPublish(string.Empty, _parser.Queue, false, basicDeliverEventArgs.BasicProperties,
-                        basicDeliverEventArgs.Body);
-                GetChannel().Acknowledge(basicDeliverEventArgs);
+                    .Model.BasicPublish(string.Empty, _parser.Queue, false, token.BasicProperties,
+                        token.Data);
+                GetChannel().Acknowledge(token);
             });
         }
 
@@ -408,5 +380,14 @@ namespace Shuttle.Esb.RabbitMQ
                 return AccessQueue(action, retry + 1);
             }
         }
+    }
+
+    internal class AcknowledgementToken
+    {
+        public byte[]  Data { get; set; }
+        
+        public ulong DeliveryTag { get; set; }
+        
+        public IBasicProperties BasicProperties { get; set; }
     }
 }
