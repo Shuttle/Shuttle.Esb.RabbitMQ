@@ -55,6 +55,7 @@ namespace Shuttle.Esb.RabbitMQ
 
             _factory = new ConnectionFactory
             {
+                DispatchConsumersAsync = false,
                 UserName = _parser.Username,
                 Password = _parser.Password,
                 HostName = _parser.Host,

@@ -30,7 +30,9 @@ namespace Shuttle.Esb.RabbitMQ
                 : configuration.RemoteQueueTimeoutMilliseconds;
         }
 
-        public IModel Model { get; }
+        public IModel Model { get; private set; }
+
+        private bool IsOpen => Model?.IsOpen == true;
 
         public AcknowledgementToken Next()
         {
@@ -59,7 +61,7 @@ namespace Shuttle.Esb.RabbitMQ
 
         private void EnsureConsumer()
         {
-            if (_consumer != null)
+            if (_consumer != null || !IsOpen)
             {
                 return;
             }
@@ -75,7 +77,8 @@ namespace Shuttle.Esb.RabbitMQ
                     DeliveryTag = args.DeliveryTag,
                 };
                 _queue.Add(token);
-            }; 
+            };
+
             string consumerTag = Model.BasicConsume(_queueName, false, _consumer);
             _consumer.ConsumerCancelled += (sender, args) => _consumer = null;
         }
@@ -88,7 +91,7 @@ namespace Shuttle.Esb.RabbitMQ
             }
 
             EnsureConsumer();
-            if (Model.IsOpen)
+            if (IsOpen)
             {
                 Model.BasicAck(acknowledgementToken.DeliveryTag, false);
             }
@@ -98,14 +101,17 @@ namespace Shuttle.Esb.RabbitMQ
         {
             try
             {
+                var model = Model;
+                Model = null;
+
                 _queue.Dispose();
 
-                if (Model.IsOpen)
+                if (model.IsOpen)
                 {
-                    Model.Close();
+                    model.Close();
                 }
 
-                Model.Dispose();
+                model.Dispose();
             }
             catch
             {
