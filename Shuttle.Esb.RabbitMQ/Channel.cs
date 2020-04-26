@@ -1,16 +1,18 @@
 ﻿using System;
-using System.Runtime.InteropServices;
+using System.Collections.Concurrent;
+using System.IO;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using RabbitMQ.Client.MessagePatterns;
 using Shuttle.Core.Contract;
 
 namespace Shuttle.Esb.RabbitMQ
 {
     internal sealed class Channel : IDisposable
     {
-        private readonly string _queue;
-        private Subscription _subscription;
+        private readonly string _queueName;
+        private volatile EventingBasicConsumer _consumer;
+        private readonly BlockingCollection<AcknowledgementToken> _queue = 
+            new BlockingCollection<AcknowledgementToken>(new ConcurrentQueue<AcknowledgementToken>());
         private readonly int _millisecondsTimeout;
 
         public Channel(IModel model, RabbitMQUriParser parser, IRabbitMQConfiguration configuration)
@@ -21,50 +23,95 @@ namespace Shuttle.Esb.RabbitMQ
 
             Model = model;
 
-            _queue = parser.Queue;
+            _queueName = parser.Queue;
 
             _millisecondsTimeout = parser.Local
                 ? configuration.LocalQueueTimeoutMilliseconds
                 : configuration.RemoteQueueTimeoutMilliseconds;
         }
 
-        public IModel Model { get; }
+        public IModel Model { get; private set; }
 
-        public BasicDeliverEventArgs Next()
+        private bool IsOpen => Model?.IsOpen == true;
+
+        public AcknowledgementToken Next()
         {
-            var next = GetSubscription().Next(_millisecondsTimeout, out var basicDeliverEventArgs);
+            EnsureConsumer();
 
-            if (next && basicDeliverEventArgs == null)
+            try
             {
-                throw new ConnectionException(string.Format(Resources.SubscriptionNextConnectionException,
-                    _subscription.QueueName));
+                var consumer = _consumer;
+                if (consumer != null && !Model.IsClosed && _queue.TryTake(out var basicDeliverEventArgs, _millisecondsTimeout))
+                {
+                    if (basicDeliverEventArgs == null)
+                    {
+                        throw new ConnectionException(string.Format(Resources.SubscriptionNextConnectionException,
+                            _queueName));
+                    }
+
+                    return basicDeliverEventArgs;
+                }
+            }
+            catch (EndOfStreamException)
+            {
+            }
+        
+            return null;
+        }
+
+        private void EnsureConsumer()
+        {
+            if (_consumer != null || !IsOpen)
+            {
+                return;
+            }
+            
+            _consumer = new EventingBasicConsumer(Model);
+            _consumer.Received += (sender, args) =>
+            {
+                // body should be copied, since it will be accessed later from another thread
+                var token = new AcknowledgementToken
+                {
+                    Data = args.Body.ToArray(),
+                    BasicProperties = args.BasicProperties,
+                    DeliveryTag = args.DeliveryTag,
+                };
+                _queue.Add(token);
+            };
+
+            string consumerTag = Model.BasicConsume(_queueName, false, _consumer);
+            _consumer.ConsumerCancelled += (sender, args) => _consumer = null;
+        }
+
+        public void Acknowledge(AcknowledgementToken acknowledgementToken)
+        {
+            if (acknowledgementToken == null)
+            {
+                return;
             }
 
-            return (next)
-                ? basicDeliverEventArgs
-                : null;
-        }
-
-        private Subscription GetSubscription()
-        {
-            return _subscription ?? (_subscription = new Subscription(Model, _queue, false));
-        }
-
-        public void Acknowledge(BasicDeliverEventArgs basicDeliverEventArgs)
-        {
-            GetSubscription().Ack(basicDeliverEventArgs);
+            EnsureConsumer();
+            if (IsOpen)
+            {
+                Model.BasicAck(acknowledgementToken.DeliveryTag, false);
+            }
         }
 
         public void Dispose()
         {
             try
             {
-                if (Model.IsOpen)
+                var model = Model;
+                Model = null;
+
+                _queue.Dispose();
+
+                if (model.IsOpen)
                 {
-                    Model.Close();
+                    model.Close();
                 }
 
-                Model.Dispose();
+                model.Dispose();
             }
             catch
             {
