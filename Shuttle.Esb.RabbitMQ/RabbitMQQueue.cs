@@ -13,8 +13,7 @@ namespace Shuttle.Esb.RabbitMQ
 {
     public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IDisposable, IPurgeQueue
     {
-        private static readonly object ConnectionLock = new object();
-        private static readonly object QueueLock = new object();
+        private static readonly object ChannelLock = new object();
 
         [ThreadStatic] private static ConditionalWeakTable<IConnection, Channel> _threadChannels;
 
@@ -80,7 +79,7 @@ namespace Shuttle.Esb.RabbitMQ
 
         private void CloseConnection()
         {
-            lock (QueueLock)
+            lock (ChannelLock)
             {
                 foreach (var channel in _channels.Keys)
                 {
@@ -89,26 +88,23 @@ namespace Shuttle.Esb.RabbitMQ
 
                 _channels.Clear();
 
-                lock (ConnectionLock)
+                if (_connection != null)
                 {
-                    if (_connection != null)
+                    if (_connection.IsOpen)
                     {
-                        if (_connection.IsOpen)
-                        {
-                            _connection.Close(_configuration.ConnectionCloseTimeout);
-                        }
-
-                        try
-                        {
-                            _connection.Dispose();
-                        }
-                        catch
-                        {
-                            // ignored
-                        }
-
-                        _connection = null;
+                        _connection.Close(_configuration.ConnectionCloseTimeout);
                     }
+
+                    try
+                    {
+                        _connection.Dispose();
+                    }
+                    catch
+                    {
+                        // ignored
+                    }
+
+                    _connection = null;
                 }
             }
         }
@@ -245,7 +241,7 @@ namespace Shuttle.Esb.RabbitMQ
                 return _connection;
             }
 
-            lock (ConnectionLock)
+            lock (ChannelLock)
             {
                 // double checked locking
                 if (_connection != null)
@@ -318,7 +314,7 @@ namespace Shuttle.Esb.RabbitMQ
 
             _threadChannels.Add(connection, channel);
 
-            lock (QueueLock)
+            lock (ChannelLock)
             {
                 _channels.Add(channel, new WeakReference<Thread>(Thread.CurrentThread));
 
