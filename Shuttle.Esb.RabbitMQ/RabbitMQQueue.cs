@@ -201,26 +201,22 @@ namespace Shuttle.Esb.RabbitMQ
             {
                 var result = GetChannel().Next();
 
-                if (result == null)
-                {
-                    return null;
-                }
-
-                var data = result.Data;
-                return new ReceivedMessage(new MemoryStream(data, 0, data.Length, false, true), result);
+                return result == null 
+                    ? null 
+                    : new ReceivedMessage(new MemoryStream(result.Data, 0, result.Data.Length, false, true), result);
             });
         }
 
         public void Acknowledge(object acknowledgementToken)
         {
-            AccessQueue(() => GetChannel().Acknowledge((AcknowledgementToken) acknowledgementToken));
+            AccessQueue(() => GetChannel().Acknowledge((DeliveredMessage) acknowledgementToken));
         }
 
         public void Release(object acknowledgementToken)
         {
             AccessQueue(() =>
             {
-                var token = (AcknowledgementToken) acknowledgementToken;
+                var token = (DeliveredMessage) acknowledgementToken;
 
                 GetChannel()
                     .Model.BasicPublish(string.Empty, _parser.Queue, false, token.BasicProperties,
@@ -270,6 +266,7 @@ namespace Shuttle.Esb.RabbitMQ
 
             var connection = _connection;
             Channel channel = null;
+
             if (connection != null && _threadChannels.TryGetValue(connection, out channel) && channel.Model.IsOpen)
             {
                 return channel;
@@ -320,6 +317,7 @@ namespace Shuttle.Esb.RabbitMQ
 
                 // remove the dead channels
                 var channelsToRemove = _channelsToRemove;
+
                 foreach (var pair in _channels)
                 {
                     if (!pair.Value.TryGetTarget(out _))
@@ -379,7 +377,7 @@ namespace Shuttle.Esb.RabbitMQ
         }
     }
 
-    internal class AcknowledgementToken
+    internal class DeliveredMessage
     {
         public byte[]  Data { get; set; }
         

@@ -11,9 +11,11 @@ namespace Shuttle.Esb.RabbitMQ
     {
         private readonly string _queueName;
         private volatile EventingBasicConsumer _consumer;
-        private readonly BlockingCollection<AcknowledgementToken> _queue = 
-            new BlockingCollection<AcknowledgementToken>(new ConcurrentQueue<AcknowledgementToken>());
+        private readonly BlockingCollection<DeliveredMessage> _queue = 
+            new BlockingCollection<DeliveredMessage>(new ConcurrentQueue<DeliveredMessage>());
         private readonly int _millisecondsTimeout;
+        private readonly object _lock = new object();
+        private bool _disposed;
 
         public Channel(IModel model, RabbitMQUriParser parser, IRabbitMQConfiguration configuration)
         {
@@ -34,22 +36,20 @@ namespace Shuttle.Esb.RabbitMQ
 
         private bool IsOpen => Model?.IsOpen == true;
 
-        public AcknowledgementToken Next()
+        public DeliveredMessage Next()
         {
             EnsureConsumer();
 
             try
             {
-                var consumer = _consumer;
-                if (consumer != null && !Model.IsClosed && _queue.TryTake(out var basicDeliverEventArgs, _millisecondsTimeout))
+                if (_consumer != null && !Model.IsClosed && _queue.TryTake(out var deliveredMessage, _millisecondsTimeout))
                 {
-                    if (basicDeliverEventArgs == null)
+                    if (deliveredMessage == null)
                     {
-                        throw new ConnectionException(string.Format(Resources.SubscriptionNextConnectionException,
-                            _queueName));
+                        throw new ConnectionException(string.Format(Resources.SubscriptionNextConnectionException, _queueName));
                     }
 
-                    return basicDeliverEventArgs;
+                    return deliveredMessage;
                 }
             }
             catch (EndOfStreamException)
@@ -67,33 +67,43 @@ namespace Shuttle.Esb.RabbitMQ
             }
             
             _consumer = new EventingBasicConsumer(Model);
+
             _consumer.Received += (sender, args) =>
             {
-                // body should be copied, since it will be accessed later from another thread
-                var token = new AcknowledgementToken
+                lock (_lock)
                 {
-                    Data = args.Body.ToArray(),
-                    BasicProperties = args.BasicProperties,
-                    DeliveryTag = args.DeliveryTag,
-                };
-                _queue.Add(token);
+                    if (_disposed)
+                    {
+                        return;
+                    }
+
+                    // body should be copied, since it will be accessed later from another thread
+                    _queue.Add(new DeliveredMessage
+                    {
+                        Data = args.Body.ToArray(),
+                        BasicProperties = args.BasicProperties,
+                        DeliveryTag = args.DeliveryTag,
+                    });
+                }
             };
 
-            string consumerTag = Model.BasicConsume(_queueName, false, _consumer);
+            Model.BasicConsume(_queueName, false, _consumer);
+
             _consumer.ConsumerCancelled += (sender, args) => _consumer = null;
         }
 
-        public void Acknowledge(AcknowledgementToken acknowledgementToken)
+        public void Acknowledge(DeliveredMessage deliveredMessage)
         {
-            if (acknowledgementToken == null)
+            if (deliveredMessage == null)
             {
                 return;
             }
 
             EnsureConsumer();
+
             if (IsOpen)
             {
-                Model.BasicAck(acknowledgementToken.DeliveryTag, false);
+                Model.BasicAck(deliveredMessage.DeliveryTag, false);
             }
         }
 
@@ -101,17 +111,19 @@ namespace Shuttle.Esb.RabbitMQ
         {
             try
             {
-                var model = Model;
-                Model = null;
-
-                _queue.Dispose();
-
-                if (model.IsOpen)
+                lock (_lock)
                 {
-                    model.Close();
-                }
+                    _queue.Dispose();
 
-                model.Dispose();
+                    if (Model.IsOpen)
+                    {
+                        Model.Close();
+                    }
+
+                    Model.Dispose();
+
+                    _disposed = true;
+                }
             }
             catch
             {
