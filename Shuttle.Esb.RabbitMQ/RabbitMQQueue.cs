@@ -28,6 +28,7 @@ namespace Shuttle.Esb.RabbitMQ
 
         private readonly RabbitMQUriParser _parser;
         private volatile IConnection _connection;
+        private bool _disposed;
 
         public RabbitMQQueue(Uri uri, IRabbitMQConfiguration configuration)
         {
@@ -75,6 +76,7 @@ namespace Shuttle.Esb.RabbitMQ
         public void Dispose()
         {
             CloseConnection();
+            _disposed = true;
         }
 
         private void CloseConnection()
@@ -340,6 +342,11 @@ namespace Shuttle.Esb.RabbitMQ
 
         private void AccessQueue(Action action, int retry = 0)
         {
+            if (_disposed)
+            {
+                return;
+            }
+
             try
             {
                 action.Invoke();
