@@ -19,8 +19,8 @@ namespace Shuttle.Esb.RabbitMQ.Tests
             TestInboxConcurrency(RabbitMQFixture.GetComponentContainer(), "rabbitmq://shuttle:shuttle!@localhost/{0}", msToComplete, isTransactionalEndpoint);
         }
 
-        [TestCase(350, true)]
-        [TestCase(350, false)]
+        [TestCase(150, true)]
+        [TestCase(150, false)]
         public void Should_be_able_to_process_queue_timeously(int count, bool isTransactionalEndpoint)
         {
             TestInboxThroughput(RabbitMQFixture.GetComponentContainer(), "rabbitmq://shuttle:shuttle!@localhost/{0}", 1000, count, isTransactionalEndpoint);

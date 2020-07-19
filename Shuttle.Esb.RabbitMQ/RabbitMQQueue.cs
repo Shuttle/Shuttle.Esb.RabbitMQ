@@ -125,6 +125,11 @@ namespace Shuttle.Esb.RabbitMQ
 
         public bool IsEmpty()
         {
+            if (_disposed)
+            {
+                return true;
+            }
+
             return AccessQueue(() =>
             {
                 var result = GetChannel().Model.BasicGet(_parser.Queue, false);
@@ -144,6 +149,11 @@ namespace Shuttle.Esb.RabbitMQ
         {
             Guard.AgainstNull(transportMessage, nameof(transportMessage));
             Guard.AgainstNull(stream, nameof(stream));
+
+            if (_disposed)
+            {
+                throw new RabbitMQQueueException(string.Format(Resources.QueueDisposed, Uri.Secured()));
+            }
 
             if (transportMessage.HasExpired())
             {
@@ -366,6 +376,11 @@ namespace Shuttle.Esb.RabbitMQ
 
         private T AccessQueue<T>(Func<T> action, int retry = 0)
         {
+            if (_disposed)
+            {
+                return default (T);
+            }
+
             try
             {
                 return action.Invoke();
