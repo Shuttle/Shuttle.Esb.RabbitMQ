@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.IO;
 using RabbitMQ.Client;
@@ -7,11 +8,11 @@ using Shuttle.Core.Contract;
 
 namespace Shuttle.Esb.RabbitMQ
 {
-    internal sealed class Channel : IDisposable
+    internal sealed class Channel : IBasicConsumer, IDisposable
     {
         private readonly string _queueName;
-        private volatile EventingBasicConsumer _consumer;
-        private readonly BlockingCollection<DeliveredMessage> _queue = 
+        private volatile bool _consumerAdded;
+        private readonly BlockingCollection<DeliveredMessage> _queue =
             new BlockingCollection<DeliveredMessage>(new ConcurrentQueue<DeliveredMessage>());
         private readonly int _millisecondsTimeout;
         private readonly object _lock = new object();
@@ -24,7 +25,7 @@ namespace Shuttle.Esb.RabbitMQ
             Guard.AgainstNull(configuration, nameof(configuration));
 
             Model = model;
-
+            
             _queueName = parser.Queue;
 
             _millisecondsTimeout = parser.Local
@@ -32,7 +33,7 @@ namespace Shuttle.Esb.RabbitMQ
                 : configuration.RemoteQueueTimeoutMilliseconds;
         }
 
-        public IModel Model { get; private set; }
+        public IModel Model { get; }
 
         private bool IsOpen => Model?.IsOpen == true;
 
@@ -42,7 +43,7 @@ namespace Shuttle.Esb.RabbitMQ
 
             try
             {
-                if (_consumer != null && !Model.IsClosed && _queue.TryTake(out var deliveredMessage, _millisecondsTimeout))
+                if (_consumerAdded && !Model.IsClosed && _queue.TryTake(out var deliveredMessage, _millisecondsTimeout))
                 {
                     if (deliveredMessage == null)
                     {
@@ -55,55 +56,29 @@ namespace Shuttle.Esb.RabbitMQ
             catch (EndOfStreamException)
             {
             }
-        
+
             return null;
         }
 
         private void EnsureConsumer()
         {
-            if (_consumer != null || !IsOpen)
+            if (_consumerAdded || !IsOpen)
             {
                 return;
             }
-            
-            _consumer = new EventingBasicConsumer(Model);
 
-            _consumer.Received += (sender, args) =>
-            {
-                lock (_lock)
-                {
-                    if (_disposed)
-                    {
-                        return;
-                    }
-
-                    // body should be copied, since it will be accessed later from another thread
-                    _queue.Add(new DeliveredMessage
-                    {
-                        Data = args.Body.ToArray(),
-                        BasicProperties = args.BasicProperties,
-                        DeliveryTag = args.DeliveryTag,
-                    });
-                }
-            };
-
-            Model.BasicConsume(_queueName, false, _consumer);
-
-            _consumer.ConsumerCancelled += (sender, args) => _consumer = null;
+            _consumerAdded = true;
+            Model.BasicConsume(_queueName, false, this);
         }
 
         public void Acknowledge(DeliveredMessage deliveredMessage)
         {
-            if (deliveredMessage == null)
-            {
-                return;
-            }
-
             EnsureConsumer();
 
             if (IsOpen)
             {
                 Model.BasicAck(deliveredMessage.DeliveryTag, false);
+                ArrayPool<byte>.Shared.Return(deliveredMessage.Data);
             }
         }
 
@@ -130,5 +105,51 @@ namespace Shuttle.Esb.RabbitMQ
                 // ignored
             }
         }
+
+        void IBasicConsumer.HandleBasicCancel(string consumerTag)
+        {
+            _consumerAdded = false;
+        }
+
+        void IBasicConsumer.HandleBasicCancelOk(string consumerTag)
+        {
+            _consumerAdded = false;
+        }
+
+        void IBasicConsumer.HandleBasicConsumeOk(string consumerTag)
+        {
+        }
+
+        void IBasicConsumer.HandleBasicDeliver(string consumerTag, ulong deliveryTag, bool redelivered, string exchange, string routingKey,
+            IBasicProperties properties, ReadOnlyMemory<byte> body)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            lock (_lock)
+            {
+                // body should be copied, since it will be accessed later from another thread
+                var data = ArrayPool<byte>.Shared.Rent(body.Length);
+                body.CopyTo(data);
+
+                _queue.Add(new DeliveredMessage
+                {
+                    Data = data,
+                    DataLength = body.Length,
+                    BasicProperties = properties,
+                    DeliveryTag = deliveryTag,
+                });
+            }
+        }
+
+        void IBasicConsumer.HandleModelShutdown(object model, ShutdownEventArgs reason)
+        {
+            _consumerAdded = false;
+        }
+
+        // not used
+        public event EventHandler<ConsumerEventArgs> ConsumerCancelled;
     }
 }

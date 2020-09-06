@@ -13,7 +13,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="RabbitMQ.Client" Version="6.0.0" />
+        <PackageReference Include="RabbitMQ.Client" Version="6.2.1" />
         <PackageReference Include="Shuttle.Core.Container" Version="11.1.3" />
         <PackageReference Include="Shuttle.Core.Uris" Version="10.0.4" />
         <PackageReference Include="Shuttle.Esb" Version="11.0.1" />

@@ -215,12 +215,17 @@ namespace Shuttle.Esb.RabbitMQ
 
                 return result == null 
                     ? null 
-                    : new ReceivedMessage(new MemoryStream(result.Data, 0, result.Data.Length, false, true), result);
+                    : new ReceivedMessage(new MemoryStream(result.Data, 0, result.DataLength, false, true), result);
             });
         }
 
         public void Acknowledge(object acknowledgementToken)
         {
+            if (acknowledgementToken == null)
+            {
+                return;
+            }
+
             AccessQueue(() => GetChannel().Acknowledge((DeliveredMessage) acknowledgementToken));
         }
 
@@ -230,10 +235,9 @@ namespace Shuttle.Esb.RabbitMQ
             {
                 var token = (DeliveredMessage) acknowledgementToken;
 
-                GetChannel()
-                    .Model.BasicPublish(string.Empty, _parser.Queue, false, token.BasicProperties,
-                        token.Data);
-                GetChannel().Acknowledge(token);
+                var channel = GetChannel();
+                channel.Model.BasicPublish(string.Empty, _parser.Queue, false, token.BasicProperties, token.Data.AsMemory(0, token.DataLength));
+                channel.Acknowledge(token);
             });
         }
 
@@ -402,6 +406,8 @@ namespace Shuttle.Esb.RabbitMQ
     internal class DeliveredMessage
     {
         public byte[]  Data { get; set; }
+
+        public int DataLength { get; set; }
         
         public ulong DeliveryTag { get; set; }
         
