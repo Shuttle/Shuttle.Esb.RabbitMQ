@@ -1,10 +1,8 @@
 # RabbitMQQueue
 
-RabbitMQ does not provide 2-phase commit out-of-the-box.  Although implementing it is not too much effort the 2PC adds tremendous overhead (as it does for anything).  For this reason shuttle does not use 2PC with RabbitMQ.
+This RabbitMQ implementation follows the `at-least-once` delivery mechanism supported by Shuttle.Esb and since RabbitMQ is a broker all communication takes place immediately with the broker.
 
-Instead you can make use of an [idempotence service](http://shuttle.github.io/shuttle-esb/idempotence-service).
-
-RabbitMQ talks directly to a queue on any server it is recommended that you use an outbox that specifies a local queue just in case the remote queue is not immediately available.
+If necessary you may want to use an *outbox* for a `store-and-forward` solution.  By using a transactional outbox such as the sql implementation you could roll back sending of messages on failure.
 
 ## Installation
 

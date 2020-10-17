@@ -9,10 +9,7 @@ namespace Shuttle.Esb.RabbitMQ
         {
             Guard.AgainstNull(registry, nameof(registry));
 
-            if (!registry.IsRegistered<IRabbitMQConfiguration>())
-            {
-                registry.Register<IRabbitMQConfiguration, RabbitMQConfiguration>();
-            }
+            registry.AttemptRegister<IRabbitMQConfiguration, RabbitMQConfiguration>();
         }
     }
 }
