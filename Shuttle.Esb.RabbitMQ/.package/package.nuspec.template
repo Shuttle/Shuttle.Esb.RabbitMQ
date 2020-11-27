@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+
+<package>
+	<metadata>
+		<id>Shuttle.Esb.RabbitMQ</id>
+		<version>#{SemanticVersion}#</version>
+		<authors>Eben Roux</authors>
+		<owners>Eben Roux</owners>
+		<license type="expression">BSD-3-Clause</license>
+		<requireLicenseAcceptance>false</requireLicenseAcceptance>
+		<icon>images\logo.png</icon>
+		<repository type="git" url="https://github.com/shuttle/Shuttle.Esb.RabbitMQ.git" />
+		<projectUrl>https://github.com/shuttle/Shuttle.Esb.RabbitMQ</projectUrl>
+		<description>RabbitMQ implementation for use with Shuttle.Esb.</description>
+		<copyright>Copyright (c) #{Year}#, Eben Roux</copyright>
+		<tags>shuttle rabbitmq</tags>
+		<dependencies>
+#{Dependencies}#
+		</dependencies>
+	</metadata>
+	<files>
+		<file src="..\..\..\.media\logo.png" target="images" />
+		<file src="lib\**\*.*" target="lib" />
+	</files>
+</package>
