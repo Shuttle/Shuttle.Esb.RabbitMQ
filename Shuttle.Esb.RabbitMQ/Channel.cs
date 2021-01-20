@@ -150,6 +150,6 @@ namespace Shuttle.Esb.RabbitMQ
         }
 
         // not used
-        public event EventHandler<ConsumerEventArgs> ConsumerCancelled;
+        public event EventHandler<ConsumerEventArgs> ConsumerCancelled = delegate { };
     }
 }
