@@ -78,7 +78,11 @@ namespace Shuttle.Esb.RabbitMQ
             if (IsOpen)
             {
                 Model.BasicAck(deliveredMessage.DeliveryTag, false);
+#if NETSTANDARD2_1
+                deliveredMessage.Stream.Dispose(); // return stream to cache
+#else
                 ArrayPool<byte>.Shared.Return(deliveredMessage.Data);
+#endif
             }
         }
 
@@ -131,13 +135,23 @@ namespace Shuttle.Esb.RabbitMQ
             lock (_lock)
             {
                 // body should be copied, since it will be accessed later from another thread
+                // in netstandard 2.0 copy to a rented array, in netstandard 2.1+ copy to a cached memory stream
+#if NETSTANDARD2_1
+                var stream = MemoryStreamCache.Manager.GetStream();
+                stream.Write(body.Span);
+#else
                 var data = ArrayPool<byte>.Shared.Rent(body.Length);
                 body.CopyTo(data);
+#endif
 
                 _queue.Add(new DeliveredMessage
                 {
+#if NETSTANDARD2_1
+                    Stream = stream,
+#else
                     Data = data,
                     DataLength = body.Length,
+#endif
                     BasicProperties = properties,
                     DeliveryTag = deliveryTag,
                 });

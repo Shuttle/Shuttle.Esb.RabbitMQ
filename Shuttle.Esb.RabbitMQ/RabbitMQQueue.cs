@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -213,7 +214,11 @@ namespace Shuttle.Esb.RabbitMQ
 
                 return result == null 
                     ? null 
+#if NETSTANDARD2_1
+                    : new ReceivedMessage(result.Stream, result);
+#else
                     : new ReceivedMessage(new MemoryStream(result.Data, 0, result.DataLength, false, true), result);
+#endif
             });
         }
 
@@ -234,7 +239,16 @@ namespace Shuttle.Esb.RabbitMQ
                 var token = (DeliveredMessage) acknowledgementToken;
 
                 var channel = GetChannel();
+#if NETSTANDARD2_1
+                int length = (int)token.Stream.Length;
+                var buffer = ArrayPool<byte>.Shared.Rent(length);
+                token.Stream.Read(buffer);
+                channel.Model.BasicPublish(string.Empty, _parser.Queue, false, token.BasicProperties, buffer.AsMemory(0, length));
+                ArrayPool<byte>.Shared.Return(buffer);
+#else
                 channel.Model.BasicPublish(string.Empty, _parser.Queue, false, token.BasicProperties, token.Data.AsMemory(0, token.DataLength));
+#endif
+
                 channel.Acknowledge(token);
             });
         }
@@ -403,10 +417,14 @@ namespace Shuttle.Esb.RabbitMQ
 
     internal class DeliveredMessage
     {
-        public byte[]  Data { get; set; }
+#if NETSTANDARD2_1
+        public Stream Stream { get; set; }
+#else
+        public byte[] Data { get; set; }
 
         public int DataLength { get; set; }
-        
+#endif
+
         public ulong DeliveryTag { get; set; }
         
         public IBasicProperties BasicProperties { get; set; }
