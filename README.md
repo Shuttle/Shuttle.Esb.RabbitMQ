@@ -10,6 +10,12 @@ If you need to install RabbitMQ you can <a target='_blank' href='https://www.rab
 
 ## Configuration
 
+Since an instance of the `IRabbitMQConfiguration` interface is required remember to register one.  Typically the default implementation will do:
+
+``` c#
+IComponentRegistry.Register<IRabbitMQConfiguration, RabbitMQConfiguration>();
+```
+
 The queue configuration is part of the specified uri, e.g.:
 
 ``` xml
