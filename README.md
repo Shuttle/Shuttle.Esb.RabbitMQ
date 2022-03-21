@@ -32,7 +32,7 @@ The queue configuration is part of the specified uri, e.g.:
 ```
 
 | Segment / Argument | Default    | Description | 
-| --- | --- | --- | --- |
+| --- | --- | --- | 
 | username:password     | empty|    |
 | virtualhost         | /    |    |
 | port                 | default    |    |
