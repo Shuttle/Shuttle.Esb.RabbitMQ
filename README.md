@@ -1,4 +1,8 @@
-# RabbitMQQueue
+# RabbitMQ
+
+```
+PM> Install-Package Shuttle.Esb.RabbitMQ
+```
 
 This RabbitMQ implementation follows the `at-least-once` delivery mechanism supported by Shuttle.Esb and since RabbitMQ is a broker all communication takes place immediately with the broker.
 
@@ -27,15 +31,15 @@ The queue configuration is part of the specified uri, e.g.:
 />
 ```
 
-| Segment / Argument | Default    | Description | Version Introduced |
+| Segment / Argument | Default    | Description | 
 | --- | --- | --- | --- |
-| username:password     | empty|    | |
-| virtualhost         | /    |    | |
-| port                 | default    |    | |
-| prefetchcount             | 25        | Specifies the number of messages to prefetch from the queue. | |
-| durable             | true     | Determines whether the queue is durable.  Note: be very mindful of the possible consequences before setting to 'false'. | v3.5.0 |
-| persistent             | true     | Determines whether messages will be persisted.  Note: be very mindful of the possible consequences before setting to 'false'. | v3.5.3 |
-| priority             | empty     | Determines the number of priorities supported by the queue. | v10.0.10 |
+| username:password     | empty|    |
+| virtualhost         | /    |    |
+| port                 | default    |    |
+| prefetchcount             | 25        | Specifies the number of messages to prefetch from the queue. |
+| durable             | true     | Determines whether the queue is durable.  Note: be very mindful of the possible consequences before setting to 'false'. |
+| persistent             | true     | Determines whether messages will be persisted.  Note: be very mindful of the possible consequences before setting to 'false'. |
+| priority             | empty     | Determines the number of priorities supported by the queue. |
 
 In addition to this there is also a RabbitMQ specific section (defaults specified here):
 
@@ -58,5 +62,3 @@ In addition to this there is also a RabbitMQ specific section (defaults specifie
   .
 <configuration>
 ```
-
-A `RabbitMQConfiguration` instance implementing the `IRabbitMQConfiguration` interface will be registered using the [container bootstrapping](http://shuttle.github.io/shuttle-core/overview-container/#Bootstrapping).  If you wish to override the configuration you should register your instance before calling the `ServiceBus.Register()` method.
