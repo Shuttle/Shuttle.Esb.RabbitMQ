@@ -3,7 +3,7 @@
 <package>
 	<metadata>
 		<id>Shuttle.Esb.RabbitMQ</id>
-		<version>12.0.0</version>
+		<version>12.0.1</version>
 		<authors>Eben Roux</authors>
 		<owners>Eben Roux</owners>
 		<license type="expression">BSD-3-Clause</license>
@@ -15,10 +15,10 @@
 		<copyright>Copyright (c) 2022, Eben Roux</copyright>
 		<tags>shuttle rabbitmq</tags>
 		<dependencies>
-      <dependency id="RabbitMQ.Client" version="6.2.2" />
-      <dependency id="Shuttle.Core.Container" version="12.0.0" />
+      <dependency id="RabbitMQ.Client" version="6.2.4" />
+      <dependency id="Shuttle.Core.Container" version="12.0.1" />
       <dependency id="Shuttle.Core.Uris" version="10.0.5" />
-      <dependency id="Shuttle.Esb" version="12.0.0" />
+      <dependency id="Shuttle.Esb" version="12.0.1" />
       <dependency id="System.Configuration.ConfigurationManager" version="6.0.0" />
 		</dependencies>
 	</metadata>
