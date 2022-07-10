@@ -1,7 +1,5 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Shuttle.Core.Container;
-using Shuttle.Esb.Tests;
 
 namespace Shuttle.Esb.RabbitMQ.Tests
 {
