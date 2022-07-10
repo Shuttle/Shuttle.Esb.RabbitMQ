@@ -18,7 +18,7 @@ namespace Shuttle.Esb.RabbitMQ
         private readonly Dictionary<string, object> _arguments = new Dictionary<string, object>();
         private readonly Dictionary<Channel, WeakReference<Thread>> _channels = new Dictionary<Channel, WeakReference<Thread>>();
         private readonly List<Channel> _channelsToRemove = new List<Channel>();
-        private readonly IRabbitMQConfiguration _configuration;
+        private readonly RabbitMQOptions _rabbitMQOptions;
         
         private readonly ConnectionFactory _factory;
 
@@ -28,10 +28,10 @@ namespace Shuttle.Esb.RabbitMQ
         private volatile IConnection _connection;
         private bool _disposed;
 
-        public RabbitMQQueue(Uri uri, IRabbitMQConfiguration configuration)
+        public RabbitMQQueue(Uri uri, RabbitMQOptions rabbitMQOptions)
         {
             Guard.AgainstNull(uri, nameof(uri));
-            Guard.AgainstNull(configuration, nameof(configuration));
+            Guard.AgainstNull(rabbitMQOptions, nameof(rabbitMQOptions));
 
             _parser = new RabbitMQUriParser(uri);
 
@@ -42,9 +42,9 @@ namespace Shuttle.Esb.RabbitMQ
                 _arguments.Add("x-max-priority", (int) _parser.Priority);
             }
 
-            _configuration = configuration;
+            _rabbitMQOptions = rabbitMQOptions;
 
-            _operationRetryCount = _configuration.OperationRetryCount;
+            _operationRetryCount = _rabbitMQOptions.OperationRetryCount;
 
             if (_operationRetryCount < 1)
             {
@@ -59,8 +59,8 @@ namespace Shuttle.Esb.RabbitMQ
                 HostName = _parser.Host,
                 VirtualHost = _parser.VirtualHost,
                 Port = _parser.Port,
-                RequestedHeartbeat = configuration.RequestedHeartbeat,
-                UseBackgroundThreadsForIO = configuration.UseBackgroundThreadsForIO
+                RequestedHeartbeat = rabbitMQOptions.RequestedHeartbeat,
+                UseBackgroundThreadsForIO = rabbitMQOptions.UseBackgroundThreadsForIO
             };
         }
 
@@ -92,7 +92,7 @@ namespace Shuttle.Esb.RabbitMQ
                 {
                     if (_connection.IsOpen)
                     {
-                        _connection.Close(_configuration.ConnectionCloseTimeout);
+                        _connection.Close(_rabbitMQOptions.ConnectionCloseTimeout);
                     }
 
                     try
@@ -120,6 +120,7 @@ namespace Shuttle.Esb.RabbitMQ
         }
 
         public Uri Uri { get; }
+        public bool IsStream => false;
 
         public bool IsEmpty()
         {
@@ -316,12 +317,12 @@ namespace Shuttle.Esb.RabbitMQ
             var model = connection.CreateModel();
 
             model.BasicQos(0,
-                (ushort) (_parser.PrefetchCount == 0 ? _configuration.DefaultPrefetchCount : _parser.PrefetchCount),
+                (ushort) (_parser.PrefetchCount == 0 ? _rabbitMQOptions.DefaultPrefetchCount : _parser.PrefetchCount),
                 false);
 
             QueueDeclare(model);
 
-            channel = new Channel(model, _parser, _configuration);
+            channel = new Channel(model, _parser, _rabbitMQOptions);
 
             _threadChannels.Add(connection, channel);
 

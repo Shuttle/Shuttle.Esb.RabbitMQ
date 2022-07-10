@@ -18,19 +18,19 @@ namespace Shuttle.Esb.RabbitMQ
         private readonly object _lock = new object();
         private bool _disposed;
 
-        public Channel(IModel model, RabbitMQUriParser parser, IRabbitMQConfiguration configuration)
+        public Channel(IModel model, RabbitMQUriParser parser, RabbitMQOptions rabbitMOptions)
         {
             Guard.AgainstNull(model, nameof(model));
             Guard.AgainstNull(parser, nameof(parser));
-            Guard.AgainstNull(configuration, nameof(configuration));
+            Guard.AgainstNull(rabbitMOptions, nameof(rabbitMOptions));
 
             Model = model;
             
             _queueName = parser.Queue;
 
-            _millisecondsTimeout = parser.Local
-                ? configuration.LocalQueueTimeoutMilliseconds
-                : configuration.RemoteQueueTimeoutMilliseconds;
+            _millisecondsTimeout = (int)(parser.Local
+                ? rabbitMOptions.LocalQueueTimeout
+                : rabbitMOptions.RemoteQueueTimeout).TotalMilliseconds;
         }
 
         public IModel Model { get; }

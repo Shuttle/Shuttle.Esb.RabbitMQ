@@ -9,7 +9,7 @@ namespace Shuttle.Esb.RabbitMQ.Tests
         [TestCase(false)]
         public void Should_be_able_handle_errors(bool isTransactionalEndpoint)
         {
-            TestOutboxSending(RabbitMQFixture.GetComponentContainer(), "rabbitmq://shuttle:shuttle!@localhost/{0}", isTransactionalEndpoint);
+            TestOutboxSending(RabbitMQFixture.GetServiceCollection(), "rabbitmq://shuttle:shuttle!@localhost/{0}", isTransactionalEndpoint);
         }
     }
 }

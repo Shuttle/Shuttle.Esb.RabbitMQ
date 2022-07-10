@@ -1,5 +1,5 @@
-﻿using Castle.Windsor;
-using Shuttle.Core.Castle;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Shuttle.Core.Container;
 using Shuttle.Esb.Tests;
 
@@ -7,13 +7,14 @@ namespace Shuttle.Esb.RabbitMQ.Tests
 {
     public static class RabbitMQFixture
     {
-        public static ComponentContainer GetComponentContainer()
+        public static IServiceCollection GetServiceCollection()
         {
-            var container = new WindsorComponentContainer(new WindsorContainer());
+            var services = new ServiceCollection();
 
-            container.Register<IRabbitMQConfiguration, RabbitMQConfiguration>();
+            services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+            services.AddRabbitMQ();
 
-            return new ComponentContainer(container, () => container);
+            return services;
         }
     }
 }
