@@ -6,12 +6,12 @@ namespace Shuttle.Esb.RabbitMQ
 {
     public class RabbitMQBuilder
     {
-        private RabbitMQOptions _serviceBusOptions = new RabbitMQOptions(); 
+        private RabbitMQOptions _rabbitMQOptions = new RabbitMQOptions(); 
         
         public RabbitMQOptions Options
         {
-            get => _serviceBusOptions;
-            set => _serviceBusOptions = value ?? throw new ArgumentNullException(nameof(value));
+            get => _rabbitMQOptions;
+            set => _rabbitMQOptions = value ?? throw new ArgumentNullException(nameof(value));
         }
 
         public RabbitMQBuilder(IServiceCollection services)

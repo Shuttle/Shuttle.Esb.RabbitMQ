@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using Microsoft.Extensions.Configuration;
 using NUnit.Framework;
-using Shuttle.Core.Configuration;
 
 namespace Shuttle.Esb.RabbitMQ.Tests
 {
