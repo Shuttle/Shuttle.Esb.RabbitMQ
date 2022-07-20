@@ -5,11 +5,13 @@ namespace Shuttle.Esb.RabbitMQ.Tests
 {
     public class RabbitMQInboxFixture : InboxFixture
     {
-        [TestCase(true)]
-        [TestCase(false)]
-        public void Should_be_able_handle_errors(bool isTransactionalEndpoint)
+        [TestCase(true, true)]
+        [TestCase(true, false)]
+        [TestCase(false, true)]
+        [TestCase(false, false)]
+        public void Should_be_able_handle_errors(bool hasErrorQueue, bool isTransactionalEndpoint)
         {
-            TestInboxError(RabbitMQFixture.GetServiceCollection(), "rabbitmq://shuttle:shuttle!@localhost/{0}", isTransactionalEndpoint);
+            TestInboxError(RabbitMQFixture.GetServiceCollection(), "rabbitmq://shuttle:shuttle!@localhost/{0}", hasErrorQueue, isTransactionalEndpoint);
         }
 
         [TestCase(250, false)]
