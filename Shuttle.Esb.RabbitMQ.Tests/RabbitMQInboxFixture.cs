@@ -25,7 +25,7 @@ namespace Shuttle.Esb.RabbitMQ.Tests
         [TestCase(150, false)]
         public void Should_be_able_to_process_queue_timeously(int count, bool isTransactionalEndpoint)
         {
-            TestInboxThroughput(RabbitMQFixture.GetServiceCollection(), "rabbitmq://shuttle:shuttle!@localhost/{0}", 1000, count, isTransactionalEndpoint);
+            TestInboxThroughput(RabbitMQFixture.GetServiceCollection(), "rabbitmq://shuttle:shuttle!@localhost/{0}", 1000, 5, count, isTransactionalEndpoint);
         }
 
         [Test]
