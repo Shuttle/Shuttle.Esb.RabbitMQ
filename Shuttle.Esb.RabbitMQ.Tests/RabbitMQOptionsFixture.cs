@@ -14,7 +14,7 @@ namespace Shuttle.Esb.RabbitMQ.Tests
 
             new ConfigurationBuilder()
                 .AddJsonFile(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @".\appsettings.json")).Build()
-                .GetRequiredSection($"{RabbitMQOptions.SectionName}").Bind(result);
+                .GetRequiredSection($"{RabbitMQOptions.SectionName}:local").Bind(result);
 
             return result;
         }
@@ -27,11 +27,10 @@ namespace Shuttle.Esb.RabbitMQ.Tests
             Assert.IsNotNull(options);
 
             Assert.AreEqual(TimeSpan.FromSeconds(30), options.RequestedHeartbeat);
-            Assert.AreEqual(TimeSpan.FromMilliseconds(1500), options.LocalQueueTimeout);
-            Assert.AreEqual(TimeSpan.FromMilliseconds(3500), options.RemoteQueueTimeout);
+            Assert.AreEqual(TimeSpan.FromMilliseconds(1500), options.QueueTimeout);
             Assert.AreEqual(TimeSpan.FromMilliseconds(1500), options.ConnectionCloseTimeout);
             Assert.AreEqual(5, options.OperationRetryCount);
-            Assert.AreEqual(100, options.DefaultPrefetchCount);
+            Assert.AreEqual(100, options.PrefetchCount);
         }
     }
 }

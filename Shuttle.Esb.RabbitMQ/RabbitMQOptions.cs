@@ -6,23 +6,19 @@ namespace Shuttle.Esb.RabbitMQ
     {
         public const string SectionName = "Shuttle:RabbitMQ";
 
-        public RabbitMQOptions()
-        {
-            RequestedHeartbeat = TimeSpan.FromSeconds(30);
-            LocalQueueTimeout = TimeSpan.FromMilliseconds(250);
-            RemoteQueueTimeout = TimeSpan.FromSeconds(1);
-            ConnectionCloseTimeout = TimeSpan.FromSeconds(1);
-            OperationRetryCount = 3;
-            DefaultPrefetchCount = 25;
-            UseBackgroundThreadsForIO = true;
-        }
-
-        public TimeSpan RequestedHeartbeat { get; set; }
-        public TimeSpan LocalQueueTimeout { get; set; }
-        public TimeSpan RemoteQueueTimeout { get; set; }
-        public TimeSpan ConnectionCloseTimeout { get; set; }
-        public int OperationRetryCount { get; set; }
-        public ushort DefaultPrefetchCount { get; set; }
-        public bool UseBackgroundThreadsForIO { get; set; }
+        public TimeSpan RequestedHeartbeat { get; set; } = TimeSpan.FromSeconds(30);
+        public TimeSpan QueueTimeout { get; set; } = TimeSpan.FromSeconds(1);
+        public TimeSpan ConnectionCloseTimeout { get; set; } = TimeSpan.FromSeconds(1);
+        public int OperationRetryCount { get; set; } = 3;
+        public bool UseBackgroundThreadsForIO { get; set; } = true;
+        public int Priority { get; set; }
+        public string Username { get; set; }
+        public string Password { get; set; }
+        public string Host { get; set; }
+        public string VirtualHost { get; set; } = "/";
+        public int Port { get; set; } = -1;
+        public bool Persistent { get; set; } = true;
+        public ushort PrefetchCount { get; set; } = 25;
+        public bool Durable { get; set; } = true;
     }
 }

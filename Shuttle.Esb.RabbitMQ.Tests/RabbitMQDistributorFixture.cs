@@ -11,7 +11,7 @@ namespace Shuttle.Esb.RabbitMQ.Tests
         public void Should_be_able_to_distribute_messages(bool isTransactionalEndpoint)
         {
             TestDistributor(RabbitMQFixture.GetServiceCollection(), 
-                RabbitMQFixture.GetServiceCollection(), @"rabbitmq://shuttle:shuttle!@localhost/{0}", isTransactionalEndpoint);
+                RabbitMQFixture.GetServiceCollection(), @"rabbitmq://local/{0}", isTransactionalEndpoint);
         }
     }
 }

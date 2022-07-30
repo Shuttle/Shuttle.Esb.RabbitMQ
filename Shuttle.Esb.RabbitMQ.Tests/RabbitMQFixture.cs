@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using System;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Shuttle.Esb.RabbitMQ.Tests
@@ -10,7 +11,18 @@ namespace Shuttle.Esb.RabbitMQ.Tests
             var services = new ServiceCollection();
 
             services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
-            services.AddRabbitMQ();
+
+            services.AddRabbitMQ(builder =>
+            {
+                builder.AddOptions("local", new RabbitMQOptions
+                {
+                    Host = "localhost",
+                    Username = "shuttle",
+                    Password = "shuttle!",
+                    PrefetchCount = 15,
+                    QueueTimeout = TimeSpan.FromMilliseconds(25)
+                });
+            });
 
             return services;
         }
