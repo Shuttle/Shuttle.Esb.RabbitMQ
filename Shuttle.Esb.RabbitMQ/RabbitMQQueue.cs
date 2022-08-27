@@ -355,7 +355,7 @@ namespace Shuttle.Esb.RabbitMQ
             }
             catch (ConnectionException)
             {
-                if (retry == 3)
+                if (retry == _operationRetryCount)
                 {
                     throw;
                 }
