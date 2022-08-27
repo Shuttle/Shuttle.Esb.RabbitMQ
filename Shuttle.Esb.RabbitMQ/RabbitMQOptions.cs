@@ -4,7 +4,7 @@ namespace Shuttle.Esb.RabbitMQ
 {
     public class RabbitMQOptions
     {
-        public const string SectionName = "Shuttle:RabbitMQ";
+        public const string SectionName = "Shuttle:ServiceBus:RabbitMQ";
 
         public TimeSpan RequestedHeartbeat { get; set; } = TimeSpan.FromSeconds(30);
         public TimeSpan QueueTimeout { get; set; } = TimeSpan.FromSeconds(1);
