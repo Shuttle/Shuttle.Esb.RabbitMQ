@@ -18,33 +18,30 @@ namespace Shuttle.Esb.RabbitMQ
         private readonly Dictionary<string, object> _arguments = new Dictionary<string, object>();
         private readonly Dictionary<Channel, WeakReference<Thread>> _channels = new Dictionary<Channel, WeakReference<Thread>>();
         private readonly List<Channel> _channelsToRemove = new List<Channel>();
-        private readonly IRabbitMQConfiguration _configuration;
+        private readonly RabbitMQOptions _rabbitMQOptions;
         
         private readonly ConnectionFactory _factory;
 
         private readonly int _operationRetryCount;
 
-        private readonly RabbitMQUriParser _parser;
         private volatile IConnection _connection;
         private bool _disposed;
 
-        public RabbitMQQueue(Uri uri, IRabbitMQConfiguration configuration)
+        public RabbitMQQueue(QueueUri uri, RabbitMQOptions rabbitMQOptions)
         {
             Guard.AgainstNull(uri, nameof(uri));
-            Guard.AgainstNull(configuration, nameof(configuration));
+            Guard.AgainstNull(rabbitMQOptions, nameof(rabbitMQOptions));
 
-            _parser = new RabbitMQUriParser(uri);
+            Uri = uri;
 
-            Uri = _parser.Uri;
+            _rabbitMQOptions = rabbitMQOptions;
 
-            if (_parser.Priority != 0)
+            if (_rabbitMQOptions.Priority != 0)
             {
-                _arguments.Add("x-max-priority", (int) _parser.Priority);
+                _arguments.Add("x-max-priority", (int)_rabbitMQOptions.Priority);
             }
 
-            _configuration = configuration;
-
-            _operationRetryCount = _configuration.OperationRetryCount;
+            _operationRetryCount = _rabbitMQOptions.OperationRetryCount;
 
             if (_operationRetryCount < 1)
             {
@@ -54,17 +51,15 @@ namespace Shuttle.Esb.RabbitMQ
             _factory = new ConnectionFactory
             {
                 DispatchConsumersAsync = false,
-                UserName = _parser.Username,
-                Password = _parser.Password,
-                HostName = _parser.Host,
-                VirtualHost = _parser.VirtualHost,
-                Port = _parser.Port,
-                RequestedHeartbeat = configuration.RequestedHeartbeat,
-                UseBackgroundThreadsForIO = configuration.UseBackgroundThreadsForIO
+                UserName = _rabbitMQOptions.Username,
+                Password = _rabbitMQOptions.Password,
+                HostName = _rabbitMQOptions.Host,
+                VirtualHost = _rabbitMQOptions.VirtualHost,
+                Port = _rabbitMQOptions.Port,
+                RequestedHeartbeat = rabbitMQOptions.RequestedHeartbeat,
+                UseBackgroundThreadsForIO = rabbitMQOptions.UseBackgroundThreadsForIO
             };
         }
-
-        public bool HasUserInfo => !string.IsNullOrEmpty(_parser.Username) && !string.IsNullOrEmpty(_parser.Password);
 
         public void Create()
         {
@@ -92,7 +87,7 @@ namespace Shuttle.Esb.RabbitMQ
                 {
                     if (_connection.IsOpen)
                     {
-                        _connection.Close(_configuration.ConnectionCloseTimeout);
+                        _connection.Close(_rabbitMQOptions.ConnectionCloseTimeout);
                     }
 
                     try
@@ -111,15 +106,16 @@ namespace Shuttle.Esb.RabbitMQ
 
         public void Drop()
         {
-            AccessQueue(() => { GetChannel().Model.QueueDelete(_parser.Queue); });
+            AccessQueue(() => { GetChannel().Model.QueueDelete(Uri.QueueName); });
         }
 
         public void Purge()
         {
-            AccessQueue(() => { GetChannel().Model.QueuePurge(_parser.Queue); });
+            AccessQueue(() => { GetChannel().Model.QueuePurge(Uri.QueueName); });
         }
 
-        public Uri Uri { get; }
+        public QueueUri Uri { get; }
+        public bool IsStream => false;
 
         public bool IsEmpty()
         {
@@ -130,7 +126,7 @@ namespace Shuttle.Esb.RabbitMQ
 
             return AccessQueue(() =>
             {
-                var result = GetChannel().Model.BasicGet(_parser.Queue, false);
+                var result = GetChannel().Model.BasicGet(Uri.QueueName, false);
 
                 if (result == null)
                 {
@@ -150,7 +146,7 @@ namespace Shuttle.Esb.RabbitMQ
 
             if (_disposed)
             {
-                throw new RabbitMQQueueException(string.Format(Resources.QueueDisposed, Uri.Secured()));
+                throw new RabbitMQQueueException(string.Format(Resources.QueueDisposed, Uri));
             }
 
             if (transportMessage.HasExpired())
@@ -164,7 +160,7 @@ namespace Shuttle.Esb.RabbitMQ
 
                 var properties = model.CreateBasicProperties();
 
-                properties.Persistent = _parser.Persistent;
+                properties.Persistent = _rabbitMQOptions.Persistent;
                 properties.CorrelationId = transportMessage.MessageId.ToString();
 
                 if (transportMessage.HasExpiryDate())
@@ -201,7 +197,7 @@ namespace Shuttle.Esb.RabbitMQ
                     data = stream.ToBytes();
                 }
 
-                model.BasicPublish(string.Empty, _parser.Queue, false, properties, data);
+                model.BasicPublish(string.Empty, Uri.QueueName, false, properties, data);
             });
         }
 
@@ -234,14 +230,14 @@ namespace Shuttle.Esb.RabbitMQ
                 var token = (DeliveredMessage) acknowledgementToken;
 
                 var channel = GetChannel();
-                channel.Model.BasicPublish(string.Empty, _parser.Queue, false, token.BasicProperties, token.Data.AsMemory(0, token.DataLength));
+                channel.Model.BasicPublish(string.Empty, Uri.QueueName, false, token.BasicProperties, token.Data.AsMemory(0, token.DataLength));
                 channel.Acknowledge(token);
             });
         }
 
         private void QueueDeclare(IModel model)
         {
-            model.QueueDeclare(_parser.Queue, _parser.Durable, false, false, _arguments);
+            model.QueueDeclare(Uri.QueueName, _rabbitMQOptions.Durable, false, false, _arguments);
         }
 
         private IConnection GetConnection()
@@ -253,7 +249,6 @@ namespace Shuttle.Esb.RabbitMQ
 
             lock (ChannelLock)
             {
-                // double checked locking
                 if (_connection != null)
                 {
                     if (_connection.IsOpen)
@@ -261,11 +256,10 @@ namespace Shuttle.Esb.RabbitMQ
                         return _connection;
                     }
 
-                    // close all channels and dispose the existing connection
                     CloseConnection();
                 }
 
-                _connection = _factory.CreateConnection(_parser.Name);
+                _connection = _factory.CreateConnection(Uri.QueueName);
             }
 
             return _connection;
@@ -288,7 +282,6 @@ namespace Shuttle.Esb.RabbitMQ
 
             if (channel != null)
             {
-                // existing channel is not open
                 _threadChannels.Remove(connection);
                 channel.Dispose();
             }
@@ -310,18 +303,16 @@ namespace Shuttle.Esb.RabbitMQ
 
             if (connection == null)
             {
-                throw new ConnectionException(string.Format(Resources.ConnectionException, Uri.Secured()));
+                throw new ConnectionException(string.Format(Resources.ConnectionException, Uri));
             }
 
             var model = connection.CreateModel();
 
-            model.BasicQos(0,
-                (ushort) (_parser.PrefetchCount == 0 ? _configuration.DefaultPrefetchCount : _parser.PrefetchCount),
-                false);
+            model.BasicQos(0, _rabbitMQOptions.PrefetchCount, false);
 
             QueueDeclare(model);
 
-            channel = new Channel(model, _parser, _configuration);
+            channel = new Channel(model, Uri, _rabbitMQOptions);
 
             _threadChannels.Add(connection, channel);
 
@@ -329,7 +320,6 @@ namespace Shuttle.Esb.RabbitMQ
             {
                 _channels.Add(channel, new WeakReference<Thread>(Thread.CurrentThread));
 
-                // remove the dead channels
                 var channelsToRemove = _channelsToRemove;
 
                 foreach (var pair in _channels)
@@ -365,7 +355,7 @@ namespace Shuttle.Esb.RabbitMQ
             }
             catch (ConnectionException)
             {
-                if (retry == 3)
+                if (retry == _operationRetryCount)
                 {
                     throw;
                 }

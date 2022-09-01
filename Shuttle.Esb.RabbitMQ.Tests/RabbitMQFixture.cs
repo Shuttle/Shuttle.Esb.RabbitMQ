@@ -1,19 +1,30 @@
-﻿using Castle.Windsor;
-using Shuttle.Core.Castle;
-using Shuttle.Core.Container;
-using Shuttle.Esb.Tests;
+﻿using System;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Shuttle.Esb.RabbitMQ.Tests
 {
     public static class RabbitMQFixture
     {
-        public static ComponentContainer GetComponentContainer()
+        public static IServiceCollection GetServiceCollection()
         {
-            var container = new WindsorComponentContainer(new WindsorContainer());
+            var services = new ServiceCollection();
 
-            container.Register<IRabbitMQConfiguration, RabbitMQConfiguration>();
+            services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
 
-            return new ComponentContainer(container, () => container);
+            services.AddRabbitMQ(builder =>
+            {
+                builder.AddOptions("local", new RabbitMQOptions
+                {
+                    Host = "localhost",
+                    Username = "shuttle",
+                    Password = "shuttle!",
+                    PrefetchCount = 15,
+                    QueueTimeout = TimeSpan.FromMilliseconds(25)
+                });
+            });
+
+            return services;
         }
     }
 }

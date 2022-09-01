@@ -1,31 +1,35 @@
 ﻿using System;
+using Microsoft.Extensions.Options;
 using Shuttle.Core.Contract;
 
 namespace Shuttle.Esb.RabbitMQ
 {
     public class RabbitMQQueueFactory : IQueueFactory
     {
-        public IRabbitMQConfiguration Configuration { get; }
+        private readonly IOptionsMonitor<RabbitMQOptions> _rabbitMQOptions;
 
-        public RabbitMQQueueFactory(IRabbitMQConfiguration configuration)
+        public RabbitMQQueueFactory(IOptionsMonitor<RabbitMQOptions> rabbitMQOptions)
         {
-            Configuration = configuration;
+            Guard.AgainstNull(rabbitMQOptions, nameof(rabbitMQOptions));
+
+            _rabbitMQOptions = rabbitMQOptions;
         }
 
-        public string Scheme => RabbitMQUriParser.Scheme;
+        public string Scheme => "rabbitmq";
 
         public IQueue Create(Uri uri)
         {
             Guard.AgainstNull(uri, nameof(uri));
 
-            return new RabbitMQQueue(uri, Configuration);
-        }
+            var queueUri = new QueueUri(uri).SchemeInvariant(Scheme);
+            var rabbitMQOptions = _rabbitMQOptions.Get(queueUri.ConfigurationName);
 
-        public bool CanCreate(Uri uri)
-        {
-            Guard.AgainstNull(uri, nameof(uri));
+            if (rabbitMQOptions == null)
+            {
+                throw new InvalidOperationException(string.Format(Esb.Resources.QueueConfigurationNameException, queueUri.ConfigurationName));
+            }
 
-            return Scheme.Equals(uri.Scheme, StringComparison.InvariantCultureIgnoreCase);
+            return new RabbitMQQueue(queueUri, rabbitMQOptions);
         }
     }
 }

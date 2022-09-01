@@ -9,6 +9,7 @@
 		<license type="expression">BSD-3-Clause</license>
 		<requireLicenseAcceptance>false</requireLicenseAcceptance>
 		<icon>images\logo.png</icon>
+		<readme>docs\README.md</readme>
 		<repository type="git" url="https://github.com/shuttle/Shuttle.Esb.RabbitMQ.git" />
 		<projectUrl>https://github.com/shuttle/Shuttle.Esb.RabbitMQ</projectUrl>
 		<description>RabbitMQ implementation for use with Shuttle.Esb.</description>
@@ -20,6 +21,7 @@
 	</metadata>
 	<files>
 		<file src="..\..\..\.media\logo.png" target="images" />
+		<file src="..\..\..\README.md" target="docs\" />
 		<file src="lib\**\*.*" target="lib" />
 	</files>
 </package>
