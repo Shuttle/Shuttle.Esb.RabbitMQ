@@ -1,6 +1,9 @@
 ﻿using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Shuttle.Core.Pipelines;
+using Shuttle.Esb.Logging;
 
 namespace Shuttle.Esb.RabbitMQ.Tests
 {
@@ -16,11 +19,12 @@ namespace Shuttle.Esb.RabbitMQ.Tests
             {
                 builder.AddOptions("local", new RabbitMQOptions
                 {
-                    Host = "localhost",
+                    Host = "127.0.0.1",
                     Username = "shuttle",
                     Password = "shuttle!",
                     PrefetchCount = 15,
-                    QueueTimeout = TimeSpan.FromMilliseconds(25)
+                    QueueTimeout = TimeSpan.FromMilliseconds(25),
+                    ConnectionCloseTimeout = TimeSpan.FromMilliseconds(25)
                 });
             });
 

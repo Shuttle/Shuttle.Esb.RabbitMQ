@@ -10,7 +10,6 @@ namespace Shuttle.Esb.RabbitMQ
 {
     internal sealed class Channel : IBasicConsumer, IDisposable
     {
-        private readonly object _lock = new object();
         private readonly int _millisecondsTimeout;
 
         private readonly BlockingCollection<DeliveredMessage> _queue =
@@ -18,6 +17,7 @@ namespace Shuttle.Esb.RabbitMQ
 
         private readonly QueueUri _uri;
         private volatile bool _consumerAdded;
+        private bool _disposing;
         private bool _disposed;
 
         public Channel(IModel model, QueueUri uri, RabbitMQOptions rabbitMOptions)
@@ -53,17 +53,17 @@ namespace Shuttle.Esb.RabbitMQ
             string routingKey,
             IBasicProperties properties, ReadOnlyMemory<byte> body)
         {
-            if (_disposed)
+            if (_disposed || _disposing)
             {
                 return;
             }
 
-            lock (_lock)
-            {
-                // body should be copied, since it will be accessed later from another thread
-                var data = ArrayPool<byte>.Shared.Rent(body.Length);
-                body.CopyTo(data);
+            // body should be copied, since it will be accessed later from another thread
+            var data = ArrayPool<byte>.Shared.Rent(body.Length);
+            body.CopyTo(data);
 
+            try
+            {
                 _queue.Add(new DeliveredMessage
                 {
                     Data = data,
@@ -71,6 +71,10 @@ namespace Shuttle.Esb.RabbitMQ
                     BasicProperties = properties,
                     DeliveryTag = deliveryTag
                 });
+            }
+            catch
+            {
+                ArrayPool<byte>.Shared.Return(data);
             }
         }
 
@@ -86,21 +90,20 @@ namespace Shuttle.Esb.RabbitMQ
 
         public void Dispose()
         {
+            _disposing = true;
+
             try
             {
-                lock (_lock)
+                _queue.Dispose();
+
+                if (Model.IsOpen)
                 {
-                    _queue.Dispose();
-
-                    if (Model.IsOpen)
-                    {
-                        Model.Close();
-                    }
-
-                    Model.Dispose();
-
-                    _disposed = true;
+                    Model.Close();
                 }
+
+                Model.Dispose();
+
+                _disposed = true;
             }
             catch
             {
@@ -126,8 +129,9 @@ namespace Shuttle.Esb.RabbitMQ
                     return deliveredMessage;
                 }
             }
-            catch (EndOfStreamException)
+            catch
             {
+                // ignore
             }
 
             return null;
@@ -141,18 +145,22 @@ namespace Shuttle.Esb.RabbitMQ
             }
 
             _consumerAdded = true;
+
             Model.BasicConsume(_uri.QueueName, false, this);
         }
 
         public void Acknowledge(DeliveredMessage deliveredMessage)
         {
+            ArrayPool<byte>.Shared.Return(deliveredMessage.Data);
+
             EnsureConsumer();
 
-            if (IsOpen)
+            if (!IsOpen)
             {
-                Model.BasicAck(deliveredMessage.DeliveryTag, false);
-                ArrayPool<byte>.Shared.Return(deliveredMessage.Data);
+                return;
             }
+
+            Model.BasicAck(deliveredMessage.DeliveryTag, false);
         }
     }
 }
