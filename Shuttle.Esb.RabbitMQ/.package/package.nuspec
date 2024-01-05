@@ -13,10 +13,10 @@
 		<repository type="git" url="https://github.com/shuttle/Shuttle.Esb.RabbitMQ.git" />
 		<projectUrl>https://github.com/shuttle/Shuttle.Esb.RabbitMQ</projectUrl>
 		<description>RabbitMQ implementation for use with Shuttle.Esb.</description>
-		<copyright>Copyright (c) 2023, Eben Roux</copyright>
+		<copyright>Copyright (c) 2024, Eben Roux</copyright>
 		<tags>shuttle rabbitmq</tags>
 		<dependencies>
-      <dependency id="RabbitMQ.Client" version="6.5.0" />
+      <dependency id="RabbitMQ.Client" version="6.8.1" />
       <dependency id="Shuttle.Esb" version="14.0.0" />
 		</dependencies>
 	</metadata>
