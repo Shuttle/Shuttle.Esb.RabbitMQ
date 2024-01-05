@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using RabbitMQ.Client;
@@ -27,25 +25,11 @@ namespace Shuttle.Esb.RabbitMQ
 
         private bool _disposed;
 
-        public event EventHandler<MessageEnqueuedEventArgs> MessageEnqueued = delegate
-        {
-        };
-
-        public event EventHandler<MessageAcknowledgedEventArgs> MessageAcknowledged = delegate
-        {
-        };
-
-        public event EventHandler<MessageReleasedEventArgs> MessageReleased = delegate
-        {
-        };
-
-        public event EventHandler<MessageReceivedEventArgs> MessageReceived = delegate
-        {
-        };
-
-        public event EventHandler<OperationCompletedEventArgs> OperationCompleted = delegate
-        {
-        };
+        public event EventHandler<MessageEnqueuedEventArgs> MessageEnqueued;
+        public event EventHandler<MessageAcknowledgedEventArgs> MessageAcknowledged;
+        public event EventHandler<MessageReleasedEventArgs> MessageReleased;
+        public event EventHandler<MessageReceivedEventArgs> MessageReceived;
+        public event EventHandler<OperationEventArgs> Operation;
 
         public RabbitMQQueue(QueueUri uri, RabbitMQOptions rabbitMQOptions, CancellationToken cancellationToken)
         {
@@ -73,25 +57,43 @@ namespace Shuttle.Esb.RabbitMQ
                 HostName = _rabbitMQOptions.Host,
                 VirtualHost = _rabbitMQOptions.VirtualHost,
                 Port = _rabbitMQOptions.Port,
-                RequestedHeartbeat = rabbitMQOptions.RequestedHeartbeat,
-                UseBackgroundThreadsForIO = rabbitMQOptions.UseBackgroundThreadsForIO
+                RequestedHeartbeat = rabbitMQOptions.RequestedHeartbeat
             };
+
+            _rabbitMQOptions.OnConfigureConsumer(this, new ConfigureEventArgs(_factory));
         }
 
-        public async Task Create()
+        public void Create()
         {
+            CreateAsync().GetAwaiter().GetResult();
+        }
+
+        public async Task CreateAsync()
+        {
+            if (_cancellationToken.IsCancellationRequested)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[create/cancelled]"));
+                return;
+            }
+
+            Operation?.Invoke(this, new OperationEventArgs("[create/starting]"));
+
             await _lock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
 
             try
             {
                 AccessQueue(() => QueueDeclare(GetChannel().Model));
-
-                OperationCompleted.Invoke(this, new OperationCompletedEventArgs("Create"));
+            }
+            catch (OperationCanceledException)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[create/cancelled]"));
             }
             finally
             {
                 _lock.Release();
             }
+
+            Operation?.Invoke(this, new OperationEventArgs("[create/completed]"));
         }
 
         public void Dispose()
@@ -112,8 +114,21 @@ namespace Shuttle.Esb.RabbitMQ
             }
         }
 
-        public async Task Drop()
+        public void Drop()
         {
+            DropAsync().GetAwaiter().GetResult();
+        }
+
+        public async Task DropAsync()
+        {
+            if (_cancellationToken.IsCancellationRequested)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[drop/cancelled]"));
+                return;
+            }
+
+            Operation?.Invoke(this, new OperationEventArgs("[drop/starting]"));
+
             await _lock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
 
             try
@@ -122,17 +137,34 @@ namespace Shuttle.Esb.RabbitMQ
                 {
                     GetChannel().Model.QueueDelete(Uri.QueueName);
                 });
-
-                OperationCompleted.Invoke(this, new OperationCompletedEventArgs("Drop"));
+            }
+            catch (OperationCanceledException)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[drop/cancelled]"));
             }
             finally
             {
                 _lock.Release();
             }
+
+            Operation?.Invoke(this, new OperationEventArgs("[drop/completed]"));
         }
 
-        public async Task Purge()
+        public void Purge()
         {
+            PurgeAsync().GetAwaiter().GetResult();
+        }
+
+        public async Task PurgeAsync()
+        {
+            if (_cancellationToken.IsCancellationRequested)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[purge/cancelled]"));
+                return;
+            }
+
+            Operation?.Invoke(this, new OperationEventArgs("[purge/starting]"));
+
             await _lock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
             
             try
@@ -141,23 +173,40 @@ namespace Shuttle.Esb.RabbitMQ
                 {
                     GetChannel().Model.QueuePurge(Uri.QueueName);
                 });
-
-                OperationCompleted.Invoke(this, new OperationCompletedEventArgs("Purge"));
+            }
+            catch (OperationCanceledException)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[purge/cancelled]"));
             }
             finally
             {
                 _lock.Release();
             }
+
+            Operation?.Invoke(this, new OperationEventArgs("[purge/completed]"));
         }
 
         public QueueUri Uri { get; }
         public bool IsStream => false;
 
-        public async ValueTask<bool> IsEmpty()
+        public bool IsEmpty()
         {
+            return IsEmptyAsync().GetAwaiter().GetResult();
+        }
+
+        public async ValueTask<bool> IsEmptyAsync()
+        {
+            if (_cancellationToken.IsCancellationRequested)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[is-empty/cancelled]", true));
+                return true;
+            }
+
+            Operation?.Invoke(this, new OperationEventArgs("[is-empty/starting]"));
+
             if (_disposed)
             {
-                return await new ValueTask<bool>(true);
+                return true;
             }
 
             await _lock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
@@ -168,14 +217,16 @@ namespace Shuttle.Esb.RabbitMQ
                 {
                     var result = GetChannel().Model.BasicGet(Uri.QueueName, false);
 
-                    if (result == null)
+                    var isEmpty = result == null;
+
+                    if (!isEmpty)
                     {
-                        return true;
+                        GetChannel().Model.BasicReject(result.DeliveryTag, true);
                     }
 
-                    GetChannel().Model.BasicReject(result.DeliveryTag, true);
+                    Operation?.Invoke(this, new OperationEventArgs("[is-empty]", isEmpty));
 
-                    return false;
+                    return isEmpty;
                 }));
             }
             finally
@@ -184,7 +235,12 @@ namespace Shuttle.Esb.RabbitMQ
             }
         }
 
-        public async Task Enqueue(TransportMessage transportMessage, Stream stream)
+        public void Enqueue(TransportMessage transportMessage, Stream stream)
+        {
+            EnqueueAsync(transportMessage, stream).GetAwaiter().GetResult();
+        }
+
+        public async Task EnqueueAsync(TransportMessage transportMessage, Stream stream)
         {
             Guard.AgainstNull(transportMessage, nameof(transportMessage));
             Guard.AgainstNull(stream, nameof(stream));
@@ -192,6 +248,12 @@ namespace Shuttle.Esb.RabbitMQ
             if (_disposed)
             {
                 throw new RabbitMQQueueException(string.Format(Resources.QueueDisposed, Uri));
+            }
+
+            if (_cancellationToken.IsCancellationRequested)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[enqueue/cancelled]"));
+                return;
             }
 
             if (transportMessage.HasExpired())
@@ -249,7 +311,11 @@ namespace Shuttle.Esb.RabbitMQ
                     model.BasicPublish(string.Empty, Uri.QueueName, false, properties, data);
                 });
 
-                MessageEnqueued.Invoke(this, new MessageEnqueuedEventArgs(transportMessage, stream));
+                MessageEnqueued?.Invoke(this, new MessageEnqueuedEventArgs(transportMessage, stream));
+            }
+            catch (OperationCanceledException)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[enqueue/cancelled]"));
             }
             finally
             {
@@ -257,8 +323,19 @@ namespace Shuttle.Esb.RabbitMQ
             }
         }
 
-        public async Task<ReceivedMessage> GetMessage()
+        public ReceivedMessage GetMessage()
         {
+            return GetMessageAsync().GetAwaiter().GetResult();
+        }
+
+        public async Task<ReceivedMessage> GetMessageAsync()
+        {
+            if (_cancellationToken.IsCancellationRequested)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[get-message/cancelled]"));
+                return null;
+            }
+
             await _lock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
 
             try
@@ -273,20 +350,37 @@ namespace Shuttle.Esb.RabbitMQ
 
                     if (receivedMessage != null)
                     {
-                        MessageReceived.Invoke(this, new MessageReceivedEventArgs(receivedMessage));
+                        MessageReceived?.Invoke(this, new MessageReceivedEventArgs(receivedMessage));
                     }
 
                     return receivedMessage;
                 }));
             }
+            catch (OperationCanceledException)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[get-message/cancelled]"));
+            }
             finally
             {
                 _lock.Release();
             }
+
+            return null;
         }
 
-        public async Task Acknowledge(object acknowledgementToken)
+        public void Acknowledge(object acknowledgementToken)
         {
+            AcknowledgeAsync(acknowledgementToken).GetAwaiter().GetResult();
+        }
+
+        public async Task AcknowledgeAsync(object acknowledgementToken)
+        {
+            if (_cancellationToken.IsCancellationRequested)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[acknowledge/cancelled]"));
+                return;
+            }
+
             await _lock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
 
             try
@@ -295,8 +389,12 @@ namespace Shuttle.Esb.RabbitMQ
                 {
                     AccessQueue(() => GetChannel().Acknowledge((DeliveredMessage)acknowledgementToken));
 
-                    MessageAcknowledged.Invoke(this, new MessageAcknowledgedEventArgs(acknowledgementToken));
+                    MessageAcknowledged?.Invoke(this, new MessageAcknowledgedEventArgs(acknowledgementToken));
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[acknowledge/cancelled]"));
             }
             finally
             {
@@ -304,8 +402,19 @@ namespace Shuttle.Esb.RabbitMQ
             }
         }
 
-        public async Task Release(object acknowledgementToken)
+        public void Release(object acknowledgementToken)
         {
+            ReleaseAsync(acknowledgementToken).GetAwaiter().GetResult();
+        }
+
+        public async Task ReleaseAsync(object acknowledgementToken)
+        {
+            if (_cancellationToken.IsCancellationRequested)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[release/cancelled]"));
+                return;
+            }
+
             await _lock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
 
             try
@@ -319,7 +428,11 @@ namespace Shuttle.Esb.RabbitMQ
                     channel.Acknowledge(token);
                 });
 
-                MessageReleased.Invoke(this, new MessageReleasedEventArgs(acknowledgementToken));
+                MessageReleased?.Invoke(this, new MessageReleasedEventArgs(acknowledgementToken));
+            }
+            catch (OperationCanceledException)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[release/cancelled]"));
             }
             finally
             {
@@ -459,17 +572,19 @@ namespace Shuttle.Esb.RabbitMQ
 
         private void QueueDeclare(IModel model)
         {
+            Operation?.Invoke(this, new OperationEventArgs("[queue-declare/starting]"));
+
             model.QueueDeclare(Uri.QueueName, _rabbitMQOptions.Durable, false, false, _arguments);
 
             try
             {
                 model.QueueDeclarePassive(Uri.QueueName);
 
-                OperationCompleted.Invoke(this, new OperationCompletedEventArgs("QueueDeclare"));
+                Operation?.Invoke(this, new OperationEventArgs("[queue-declare/]"));
             }
             catch
             {
-                OperationCompleted.Invoke(this, new OperationCompletedEventArgs("QueueDeclare (FAILED)"));
+                Operation?.Invoke(this, new OperationEventArgs("[queue-declare/failed]"));
             }
         }
     }

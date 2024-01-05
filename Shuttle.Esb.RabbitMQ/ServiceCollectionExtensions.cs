@@ -27,7 +27,6 @@ namespace Shuttle.Esb.RabbitMQ
                     options.QueueTimeout = pair.Value.QueueTimeout;
                     options.OperationRetryCount = pair.Value.OperationRetryCount;
                     options.RequestedHeartbeat = pair.Value.RequestedHeartbeat;
-                    options.UseBackgroundThreadsForIO = pair.Value.UseBackgroundThreadsForIO;
                     options.Priority = pair.Value.Priority;
                     options.Host = pair.Value.Host;
                     options.VirtualHost = pair.Value.VirtualHost;
@@ -42,6 +41,11 @@ namespace Shuttle.Esb.RabbitMQ
                     {
                         options.PrefetchCount = 0;
                     }
+
+                    options.Configure += (sender, args) =>
+                    {
+                        pair.Value.OnConfigureConsumer(sender, args);
+                    };
                 });
             }
 

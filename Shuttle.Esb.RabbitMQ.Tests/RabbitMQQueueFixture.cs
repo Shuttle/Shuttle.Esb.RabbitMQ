@@ -8,22 +8,41 @@ namespace Shuttle.Esb.RabbitMQ.Tests
     public class RabbitMQQueueFixture : BasicQueueFixture
     {
         [Test]
-        public async Task Should_be_able_to_perform_simple_enqueue_and_get_message()
+        public void Should_be_able_to_perform_simple_enqueue_and_get_message()
         {
-            await TestSimpleEnqueueAndGetMessage(RabbitMQFixture.GetServiceCollection(), "rabbitmq://local/{0}");
-            await TestSimpleEnqueueAndGetMessage(RabbitMQFixture.GetServiceCollection(), "rabbitmq://local/{0}-transient?durable=false");
+            TestSimpleEnqueueAndGetMessage(RabbitMQFixture.GetServiceCollection(), "rabbitmq://local/{0}");
+            TestSimpleEnqueueAndGetMessage(RabbitMQFixture.GetServiceCollection(), "rabbitmq://local/{0}-transient?durable=false");
         }
 
         [Test]
-        public async Task Should_be_able_to_release_a_message()
+        public async Task Should_be_able_to_perform_simple_enqueue_and_get_message_async()
         {
-            await TestReleaseMessage(RabbitMQFixture.GetServiceCollection(), "rabbitmq://local/{0}");
+            await TestSimpleEnqueueAndGetMessageAsync(RabbitMQFixture.GetServiceCollection(), "rabbitmq://local/{0}");
+            await TestSimpleEnqueueAndGetMessageAsync(RabbitMQFixture.GetServiceCollection(), "rabbitmq://local/{0}-transient?durable=false");
         }
 
         [Test]
-        public async Task Should_be_able_to_get_message_again_when_not_acknowledged_before_queue_is_disposed()
+        public void Should_be_able_to_release_a_message()
         {
-            await TestUnacknowledgedMessage(RabbitMQFixture.GetServiceCollection(), "rabbitmq://local/{0}");
+            TestReleaseMessage(RabbitMQFixture.GetServiceCollection(), "rabbitmq://local/{0}");
+        }
+
+        [Test]
+        public async Task Should_be_able_to_release_a_message_async()
+        {
+            await TestReleaseMessageAsync(RabbitMQFixture.GetServiceCollection(), "rabbitmq://local/{0}");
+        }
+
+        [Test]
+        public void Should_be_able_to_get_message_again_when_not_acknowledged_before_queue_is_disposed()
+        {
+            TestUnacknowledgedMessage(RabbitMQFixture.GetServiceCollection(), "rabbitmq://local/{0}");
+        }
+
+        [Test]
+        public async Task Should_be_able_to_get_message_again_when_not_acknowledged_before_queue_is_disposed_async()
+        {
+            await TestUnacknowledgedMessageAsync(RabbitMQFixture.GetServiceCollection(), "rabbitmq://local/{0}");
         }
     }
 }

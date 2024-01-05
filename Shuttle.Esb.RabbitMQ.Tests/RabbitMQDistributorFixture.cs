@@ -9,10 +9,17 @@ namespace Shuttle.Esb.RabbitMQ.Tests
         [Test]
         [TestCase(false)]
         [TestCase(true)]
-        public async Task Should_be_able_to_distribute_messages(bool isTransactionalEndpoint)
+        public void Should_be_able_to_distribute_messages(bool isTransactionalEndpoint)
         {
-            await TestDistributor(RabbitMQFixture.GetServiceCollection(), 
-                RabbitMQFixture.GetServiceCollection(), @"rabbitmq://local/{0}", isTransactionalEndpoint);
+            TestDistributor(RabbitMQFixture.GetServiceCollection(), RabbitMQFixture.GetServiceCollection(), @"rabbitmq://local/{0}", isTransactionalEndpoint);
+        }
+
+        [Test]
+        [TestCase(false)]
+        [TestCase(true)]
+        public async Task Should_be_able_to_distribute_messages_async(bool isTransactionalEndpoint)
+        {
+            await TestDistributorAsync(RabbitMQFixture.GetServiceCollection(), RabbitMQFixture.GetServiceCollection(), @"rabbitmq://local/{0}", isTransactionalEndpoint);
         }
     }
 }
