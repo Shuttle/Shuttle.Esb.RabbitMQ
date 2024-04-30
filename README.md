@@ -21,7 +21,7 @@ services.AddRabbitMQ(builder =>
 {
     builder.AddOptions("local", new RabbitMQOptions
     {
-        Host = "localhost",
+        Host = "127.0.0.1",
         VirtualHost = "/",
         Port = -1,
         Username = "shuttle",
@@ -46,7 +46,7 @@ The default JSON settings structure is as follows:
   "Shuttle": {
     "RabbitMQ": {
       "local": {
-        "Host": "localhost",
+        "Host": "127.0.0.1",
         "VirtualHost": "/",
         "Port": -1,
         "Username": "shuttle",

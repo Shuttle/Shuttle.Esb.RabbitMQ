@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Shuttle.Core.Contract;
+using System;
 
 namespace Shuttle.Esb.RabbitMQ
 {
@@ -10,7 +11,6 @@ namespace Shuttle.Esb.RabbitMQ
         public TimeSpan QueueTimeout { get; set; } = TimeSpan.FromSeconds(1);
         public TimeSpan ConnectionCloseTimeout { get; set; } = TimeSpan.FromSeconds(1);
         public int OperationRetryCount { get; set; } = 3;
-        public bool UseBackgroundThreadsForIO { get; set; } = true;
         public int Priority { get; set; }
         public string Username { get; set; }
         public string Password { get; set; }
@@ -20,5 +20,15 @@ namespace Shuttle.Esb.RabbitMQ
         public bool Persistent { get; set; } = true;
         public ushort PrefetchCount { get; set; } = 25;
         public bool Durable { get; set; } = true;
+
+        public event EventHandler<ConfigureEventArgs> Configure;
+
+        public void OnConfigureConsumer(object sender, ConfigureEventArgs args)
+        {
+            Guard.AgainstNull(sender, nameof(sender));
+            Guard.AgainstNull(args, nameof(args));
+
+            Configure?.Invoke(sender, args);
+        }
     }
 }

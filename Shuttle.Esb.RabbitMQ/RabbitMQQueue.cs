@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Tasks;
 using RabbitMQ.Client;
 using Shuttle.Core.Contract;
 using Shuttle.Core.Streams;
@@ -11,34 +11,35 @@ namespace Shuttle.Esb.RabbitMQ
 {
     public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IDisposable, IPurgeQueue
     {
-        private static readonly object ChannelLock = new object();
-
-        [ThreadStatic] private static ConditionalWeakTable<IConnection, Channel> _threadChannels;
-
         private readonly Dictionary<string, object> _arguments = new Dictionary<string, object>();
-        private readonly Dictionary<Channel, WeakReference<Thread>> _channels = new Dictionary<Channel, WeakReference<Thread>>();
-        private readonly List<Channel> _channelsToRemove = new List<Channel>();
-        private readonly RabbitMQOptions _rabbitMQOptions;
-        
+        private readonly CancellationToken _cancellationToken;
+
         private readonly ConnectionFactory _factory;
+        private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
 
         private readonly int _operationRetryCount;
+        private readonly RabbitMQOptions _rabbitMQOptions;
+        private Channel _channel;
 
-        private volatile IConnection _connection;
+        private IConnection _connection;
+
         private bool _disposed;
 
-        public RabbitMQQueue(QueueUri uri, RabbitMQOptions rabbitMQOptions)
+        public event EventHandler<MessageEnqueuedEventArgs> MessageEnqueued;
+        public event EventHandler<MessageAcknowledgedEventArgs> MessageAcknowledged;
+        public event EventHandler<MessageReleasedEventArgs> MessageReleased;
+        public event EventHandler<MessageReceivedEventArgs> MessageReceived;
+        public event EventHandler<OperationEventArgs> Operation;
+
+        public RabbitMQQueue(QueueUri uri, RabbitMQOptions rabbitMQOptions, CancellationToken cancellationToken)
         {
-            Guard.AgainstNull(uri, nameof(uri));
-            Guard.AgainstNull(rabbitMQOptions, nameof(rabbitMQOptions));
-
-            Uri = uri;
-
-            _rabbitMQOptions = rabbitMQOptions;
+            Uri = Guard.AgainstNull(uri, nameof(uri));
+            _rabbitMQOptions = Guard.AgainstNull(rabbitMQOptions, nameof(rabbitMQOptions));
+            _cancellationToken = cancellationToken;
 
             if (_rabbitMQOptions.Priority != 0)
             {
-                _arguments.Add("x-max-priority", (int)_rabbitMQOptions.Priority);
+                _arguments.Add("x-max-priority", _rabbitMQOptions.Priority);
             }
 
             _operationRetryCount = _rabbitMQOptions.OperationRetryCount;
@@ -56,62 +57,133 @@ namespace Shuttle.Esb.RabbitMQ
                 HostName = _rabbitMQOptions.Host,
                 VirtualHost = _rabbitMQOptions.VirtualHost,
                 Port = _rabbitMQOptions.Port,
-                RequestedHeartbeat = rabbitMQOptions.RequestedHeartbeat,
-                UseBackgroundThreadsForIO = rabbitMQOptions.UseBackgroundThreadsForIO
+                RequestedHeartbeat = rabbitMQOptions.RequestedHeartbeat
             };
+
+            _rabbitMQOptions.OnConfigureConsumer(this, new ConfigureEventArgs(_factory));
         }
 
         public void Create()
         {
-            AccessQueue(() => QueueDeclare(GetChannel().Model));
+            CreateAsync().GetAwaiter().GetResult();
+        }
+
+        public async Task CreateAsync()
+        {
+            if (_cancellationToken.IsCancellationRequested)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[create/cancelled]"));
+                return;
+            }
+
+            Operation?.Invoke(this, new OperationEventArgs("[create/starting]"));
+
+            await _lock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+
+            try
+            {
+                AccessQueue(() => QueueDeclare(GetChannel().Model));
+            }
+            catch (OperationCanceledException)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[create/cancelled]"));
+            }
+            finally
+            {
+                _lock.Release();
+            }
+
+            Operation?.Invoke(this, new OperationEventArgs("[create/completed]"));
         }
 
         public void Dispose()
         {
-            CloseConnection();
-            _disposed = true;
-        }
+            _lock.Wait(CancellationToken.None);
 
-        private void CloseConnection()
-        {
-            lock (ChannelLock)
+            try
             {
-                foreach (var channel in _channels.Keys)
-                {
-                    channel.Dispose();
-                }
+                _channel?.Dispose();
 
-                _channels.Clear();
+                _disposed = true;
 
-                if (_connection != null)
-                {
-                    if (_connection.IsOpen)
-                    {
-                        _connection.Close(_rabbitMQOptions.ConnectionCloseTimeout);
-                    }
-
-                    try
-                    {
-                        _connection.Dispose();
-                    }
-                    catch
-                    {
-                        // ignored
-                    }
-
-                    _connection = null;
-                }
+                CloseConnection();
+            }
+            finally
+            {
+                _lock.Release();
             }
         }
 
         public void Drop()
         {
-            AccessQueue(() => { GetChannel().Model.QueueDelete(Uri.QueueName); });
+            DropAsync().GetAwaiter().GetResult();
+        }
+
+        public async Task DropAsync()
+        {
+            if (_cancellationToken.IsCancellationRequested)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[drop/cancelled]"));
+                return;
+            }
+
+            Operation?.Invoke(this, new OperationEventArgs("[drop/starting]"));
+
+            await _lock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+
+            try
+            {
+                AccessQueue(() =>
+                {
+                    GetChannel().Model.QueueDelete(Uri.QueueName);
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[drop/cancelled]"));
+            }
+            finally
+            {
+                _lock.Release();
+            }
+
+            Operation?.Invoke(this, new OperationEventArgs("[drop/completed]"));
         }
 
         public void Purge()
         {
-            AccessQueue(() => { GetChannel().Model.QueuePurge(Uri.QueueName); });
+            PurgeAsync().GetAwaiter().GetResult();
+        }
+
+        public async Task PurgeAsync()
+        {
+            if (_cancellationToken.IsCancellationRequested)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[purge/cancelled]"));
+                return;
+            }
+
+            Operation?.Invoke(this, new OperationEventArgs("[purge/starting]"));
+
+            await _lock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+            
+            try
+            {
+                AccessQueue(() =>
+                {
+                    GetChannel().Model.QueuePurge(Uri.QueueName);
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[purge/cancelled]"));
+            }
+            finally
+            {
+                _lock.Release();
+            }
+
+            Operation?.Invoke(this, new OperationEventArgs("[purge/completed]"));
         }
 
         public QueueUri Uri { get; }
@@ -119,27 +191,56 @@ namespace Shuttle.Esb.RabbitMQ
 
         public bool IsEmpty()
         {
+            return IsEmptyAsync().GetAwaiter().GetResult();
+        }
+
+        public async ValueTask<bool> IsEmptyAsync()
+        {
+            if (_cancellationToken.IsCancellationRequested)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[is-empty/cancelled]", true));
+                return true;
+            }
+
+            Operation?.Invoke(this, new OperationEventArgs("[is-empty/starting]"));
+
             if (_disposed)
             {
                 return true;
             }
 
-            return AccessQueue(() =>
+            await _lock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+
+            try
             {
-                var result = GetChannel().Model.BasicGet(Uri.QueueName, false);
-
-                if (result == null)
+                return await new ValueTask<bool>(AccessQueue(() =>
                 {
-                    return true;
-                }
+                    var result = GetChannel().Model.BasicGet(Uri.QueueName, false);
 
-                GetChannel().Model.BasicReject(result.DeliveryTag, true);
+                    var isEmpty = result == null;
 
-                return false;
-            });
+                    if (!isEmpty)
+                    {
+                        GetChannel().Model.BasicReject(result.DeliveryTag, true);
+                    }
+
+                    Operation?.Invoke(this, new OperationEventArgs("[is-empty]", isEmpty));
+
+                    return isEmpty;
+                }));
+            }
+            finally
+            {
+                _lock.Release();
+            }
         }
 
         public void Enqueue(TransportMessage transportMessage, Stream stream)
+        {
+            EnqueueAsync(transportMessage, stream).GetAwaiter().GetResult();
+        }
+
+        public async Task EnqueueAsync(TransportMessage transportMessage, Stream stream)
         {
             Guard.AgainstNull(transportMessage, nameof(transportMessage));
             Guard.AgainstNull(stream, nameof(stream));
@@ -149,202 +250,199 @@ namespace Shuttle.Esb.RabbitMQ
                 throw new RabbitMQQueueException(string.Format(Resources.QueueDisposed, Uri));
             }
 
+            if (_cancellationToken.IsCancellationRequested)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[enqueue/cancelled]"));
+                return;
+            }
+
             if (transportMessage.HasExpired())
             {
                 return;
             }
 
-            AccessQueue(() =>
+            await _lock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+
+            try
             {
-                var model = GetChannel().Model;
-
-                var properties = model.CreateBasicProperties();
-
-                properties.Persistent = _rabbitMQOptions.Persistent;
-                properties.CorrelationId = transportMessage.MessageId.ToString();
-
-                if (transportMessage.HasExpiryDate())
+                AccessQueue(() =>
                 {
-                    var milliseconds = (long) (transportMessage.ExpiryDate - DateTime.Now).TotalMilliseconds;
+                    var model = GetChannel().Model;
 
-                    if (milliseconds < 1)
+                    var properties = model.CreateBasicProperties();
+
+                    properties.Persistent = _rabbitMQOptions.Persistent;
+                    properties.CorrelationId = transportMessage.MessageId.ToString();
+
+                    if (transportMessage.HasExpiryDate())
                     {
-                        return;
+                        var milliseconds = (long)(transportMessage.ExpiryDate - DateTime.Now).TotalMilliseconds;
+
+                        if (milliseconds < 1)
+                        {
+                            milliseconds = 1;
+                        }
+
+                        properties.Expiration = milliseconds.ToString();
                     }
 
-                    properties.Expiration = milliseconds.ToString();
-                }
-
-                if (transportMessage.HasPriority())
-                {
-                    if (transportMessage.Priority > 255)
+                    if (transportMessage.HasPriority())
                     {
-                        transportMessage.Priority = 255;
+                        if (transportMessage.Priority > 255)
+                        {
+                            transportMessage.Priority = 255;
+                        }
+
+                        properties.Priority = (byte)transportMessage.Priority;
                     }
 
-                    properties.Priority = (byte) transportMessage.Priority;
-                }
+                    ReadOnlyMemory<byte> data;
 
-                ReadOnlyMemory<byte> data;
+                    if (stream is MemoryStream ms && ms.TryGetBuffer(out var segment))
+                    {
+                        var length = (int)ms.Length;
+                        data = new ReadOnlyMemory<byte>(segment.Array, segment.Offset, length);
+                    }
+                    else
+                    {
+                        data = stream.ToBytes();
+                    }
 
-                if (stream is MemoryStream ms && ms.TryGetBuffer(out var segment))
-                {
-                    var length = (int) ms.Length;
-                    data = new ReadOnlyMemory<byte>(segment.Array, segment.Offset, length);
-                }
-                else
-                {
-                    data = stream.ToBytes();
-                }
+                    model.BasicPublish(string.Empty, Uri.QueueName, false, properties, data);
+                });
 
-                model.BasicPublish(string.Empty, Uri.QueueName, false, properties, data);
-            });
+                MessageEnqueued?.Invoke(this, new MessageEnqueuedEventArgs(transportMessage, stream));
+            }
+            catch (OperationCanceledException)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[enqueue/cancelled]"));
+            }
+            finally
+            {
+                _lock.Release();
+            }
         }
 
         public ReceivedMessage GetMessage()
         {
-            return AccessQueue(() =>
-            {
-                var result = GetChannel().Next();
+            return GetMessageAsync().GetAwaiter().GetResult();
+        }
 
-                return result == null 
-                    ? null 
-                    : new ReceivedMessage(new MemoryStream(result.Data, 0, result.DataLength, false, true), result);
-            });
+        public async Task<ReceivedMessage> GetMessageAsync()
+        {
+            if (_cancellationToken.IsCancellationRequested)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[get-message/cancelled]"));
+                return null;
+            }
+
+            await _lock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+
+            try
+            {
+                return await Task.FromResult(AccessQueue(() =>
+                {
+                    var result = GetChannel().Next();
+
+                    var receivedMessage = result == null
+                        ? null
+                        : new ReceivedMessage(new MemoryStream(result.Data, 0, result.DataLength, false, true), result);
+
+                    if (receivedMessage != null)
+                    {
+                        MessageReceived?.Invoke(this, new MessageReceivedEventArgs(receivedMessage));
+                    }
+
+                    return receivedMessage;
+                }));
+            }
+            catch (OperationCanceledException)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[get-message/cancelled]"));
+            }
+            finally
+            {
+                _lock.Release();
+            }
+
+            return null;
         }
 
         public void Acknowledge(object acknowledgementToken)
         {
-            if (acknowledgementToken == null)
+            AcknowledgeAsync(acknowledgementToken).GetAwaiter().GetResult();
+        }
+
+        public async Task AcknowledgeAsync(object acknowledgementToken)
+        {
+            if (_cancellationToken.IsCancellationRequested)
             {
+                Operation?.Invoke(this, new OperationEventArgs("[acknowledge/cancelled]"));
                 return;
             }
 
-            AccessQueue(() => GetChannel().Acknowledge((DeliveredMessage) acknowledgementToken));
+            await _lock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+
+            try
+            {
+                if (acknowledgementToken != null)
+                {
+                    AccessQueue(() => GetChannel().Acknowledge((DeliveredMessage)acknowledgementToken));
+
+                    MessageAcknowledged?.Invoke(this, new MessageAcknowledgedEventArgs(acknowledgementToken));
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[acknowledge/cancelled]"));
+            }
+            finally
+            {
+                _lock.Release();
+            }
         }
 
         public void Release(object acknowledgementToken)
         {
-            AccessQueue(() =>
-            {
-                var token = (DeliveredMessage) acknowledgementToken;
-
-                var channel = GetChannel();
-                channel.Model.BasicPublish(string.Empty, Uri.QueueName, false, token.BasicProperties, token.Data.AsMemory(0, token.DataLength));
-                channel.Acknowledge(token);
-            });
+            ReleaseAsync(acknowledgementToken).GetAwaiter().GetResult();
         }
 
-        private void QueueDeclare(IModel model)
+        public async Task ReleaseAsync(object acknowledgementToken)
         {
-            model.QueueDeclare(Uri.QueueName, _rabbitMQOptions.Durable, false, false, _arguments);
-        }
-
-        private IConnection GetConnection()
-        {
-            if (_connection != null && _connection.IsOpen)
+            if (_cancellationToken.IsCancellationRequested)
             {
-                return _connection;
+                Operation?.Invoke(this, new OperationEventArgs("[release/cancelled]"));
+                return;
             }
 
-            lock (ChannelLock)
+            await _lock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+
+            try
             {
-                if (_connection != null)
+                AccessQueue(() =>
                 {
-                    if (_connection.IsOpen)
-                    {
-                        return _connection;
-                    }
+                    var token = (DeliveredMessage)acknowledgementToken;
 
-                    CloseConnection();
-                }
+                    var channel = GetChannel();
+                    channel.Model.BasicPublish(string.Empty, Uri.QueueName, false, token.BasicProperties, token.Data.AsMemory(0, token.DataLength));
+                    channel.Acknowledge(token);
+                });
 
-                _connection = _factory.CreateConnection(Uri.QueueName);
+                MessageReleased?.Invoke(this, new MessageReleasedEventArgs(acknowledgementToken));
             }
-
-            return _connection;
-        }
-
-        private Channel GetChannel()
-        {
-            if (_threadChannels == null)
+            catch (OperationCanceledException)
             {
-                _threadChannels = new ConditionalWeakTable<IConnection, Channel>();
+                Operation?.Invoke(this, new OperationEventArgs("[release/cancelled]"));
             }
-
-            var connection = _connection;
-            Channel channel = null;
-
-            if (connection != null && _threadChannels.TryGetValue(connection, out channel) && channel.Model.IsOpen)
+            finally
             {
-                return channel;
+                _lock.Release();
             }
-
-            if (channel != null)
-            {
-                _threadChannels.Remove(connection);
-                channel.Dispose();
-            }
-            
-            var retry = 0;
-            connection = null;
-
-            while (connection == null && retry < _operationRetryCount)
-            {
-                try
-                {
-                    connection = GetConnection();
-                }
-                catch 
-                {
-                    retry++;
-                }
-            }
-
-            if (connection == null)
-            {
-                throw new ConnectionException(string.Format(Resources.ConnectionException, Uri));
-            }
-
-            var model = connection.CreateModel();
-
-            model.BasicQos(0, _rabbitMQOptions.PrefetchCount, false);
-
-            QueueDeclare(model);
-
-            channel = new Channel(model, Uri, _rabbitMQOptions);
-
-            _threadChannels.Add(connection, channel);
-
-            lock (ChannelLock)
-            {
-                _channels.Add(channel, new WeakReference<Thread>(Thread.CurrentThread));
-
-                var channelsToRemove = _channelsToRemove;
-
-                foreach (var pair in _channels)
-                {
-                    if (!pair.Value.TryGetTarget(out _))
-                    {
-                        channelsToRemove.Add(pair.Key);
-                    }
-                }
-
-                foreach (var channelToRemove in channelsToRemove)
-                {
-                    _channels.Remove(channelToRemove);
-                    channelToRemove.Dispose();
-                }
-
-                _channelsToRemove.Clear();
-            }
-
-            return channel;
         }
 
         private void AccessQueue(Action action, int retry = 0)
         {
-            if (_disposed)
+            if (_disposed || _cancellationToken.IsCancellationRequested)
             {
                 return;
             }
@@ -370,7 +468,7 @@ namespace Shuttle.Esb.RabbitMQ
         {
             if (_disposed)
             {
-                return default (T);
+                return default;
             }
 
             try
@@ -389,16 +487,115 @@ namespace Shuttle.Esb.RabbitMQ
                 return AccessQueue(action, retry + 1);
             }
         }
+
+        private void CloseConnection()
+        {
+            if (_connection == null)
+            {
+                return;
+            }
+
+            if (_connection.IsOpen)
+            {
+                _connection.Close(_rabbitMQOptions.ConnectionCloseTimeout);
+            }
+
+            try
+            {
+                _connection.Dispose();
+            }
+            catch
+            {
+                // ignored
+            }
+        }
+
+        private Channel GetChannel()
+        {
+            if (_connection != null && _channel != null && _channel.Model.IsOpen)
+            {
+                return _channel;
+            }
+
+            _channel?.Dispose();
+
+            var retry = 0;
+            _connection = null;
+
+            while (_connection == null && retry < _operationRetryCount)
+            {
+                try
+                {
+                    _connection = GetConnection();
+                }
+                catch
+                {
+                    retry++;
+                }
+            }
+
+            if (_connection == null)
+            {
+                throw new ConnectionException(string.Format(Resources.ConnectionException, Uri));
+            }
+
+            var model = _connection.CreateModel();
+
+            model.BasicQos(0, _rabbitMQOptions.PrefetchCount, false);
+
+            QueueDeclare(model);
+
+            _channel = new Channel(model, Uri, _rabbitMQOptions);
+
+            return _channel;
+        }
+
+        private IConnection GetConnection()
+        {
+            if (_connection is { IsOpen: true })
+            {
+                return _connection;
+            }
+
+            if (_connection != null)
+            {
+                if (_connection.IsOpen)
+                {
+                    return _connection;
+                }
+
+                CloseConnection();
+            }
+
+            return _factory.CreateConnection(Uri.QueueName);
+        }
+
+        private void QueueDeclare(IModel model)
+        {
+            Operation?.Invoke(this, new OperationEventArgs("[queue-declare/starting]"));
+
+            model.QueueDeclare(Uri.QueueName, _rabbitMQOptions.Durable, false, false, _arguments);
+
+            try
+            {
+                model.QueueDeclarePassive(Uri.QueueName);
+
+                Operation?.Invoke(this, new OperationEventArgs("[queue-declare/]"));
+            }
+            catch
+            {
+                Operation?.Invoke(this, new OperationEventArgs("[queue-declare/failed]"));
+            }
+        }
     }
 
     internal class DeliveredMessage
     {
-        public byte[]  Data { get; set; }
+        public IBasicProperties BasicProperties { get; set; }
+        public byte[] Data { get; set; }
 
         public int DataLength { get; set; }
-        
+
         public ulong DeliveryTag { get; set; }
-        
-        public IBasicProperties BasicProperties { get; set; }
     }
 }
