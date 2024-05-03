@@ -15,7 +15,7 @@
 
   <ItemGroup>
     <PackageReference Include="RabbitMQ.Client" Version="6.8.1" />
-    <PackageReference Include="Shuttle.Esb" Version="14.0.0" />
+    <PackageReference Include="Shuttle.Esb" Version="14.0.1" />
   </ItemGroup>
 
   <ItemGroup>
