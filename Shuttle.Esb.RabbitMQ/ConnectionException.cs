@@ -1,11 +1,10 @@
 ﻿using System;
 
-namespace Shuttle.Esb.RabbitMQ
+namespace Shuttle.Esb.RabbitMQ;
+
+internal class ConnectionException : Exception
 {
-    internal class ConnectionException : Exception
+    public ConnectionException(string message) : base(message)
     {
-        public ConnectionException(string message) : base(message)
-        {
-        }
     }
 }
