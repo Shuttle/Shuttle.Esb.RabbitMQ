@@ -11,7 +11,7 @@ namespace Shuttle.Esb.RabbitMQ;
 
 public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDisposable
 {
-    private readonly Dictionary<string, object> _arguments = new();
+    private readonly Dictionary<string, object?> _arguments = new();
     private readonly CancellationToken _cancellationToken;
 
     private readonly ConnectionFactory _factory;
@@ -20,7 +20,7 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
     private readonly int _operationRetryCount;
     private readonly RabbitMQOptions _rabbitMQOptions;
 
-    private Channel? _channel;
+    private RawChannel? _channel;
     private IConnection? _connection;
 
     private bool _disposed;
@@ -45,7 +45,6 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
 
         _factory = new()
         {
-            DispatchConsumersAsync = false,
             UserName = _rabbitMQOptions.Username,
             Password = _rabbitMQOptions.Password,
             HostName = _rabbitMQOptions.Host,
@@ -71,7 +70,7 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
 
         try
         {
-            AccessQueue(() => QueueDeclare(GetChannel().Model));
+            await AccessQueueAsync(async () => await QueueDeclareAsync((await GetRawChannelAsync()).Channel));
         }
         catch (OperationCanceledException)
         {
@@ -95,7 +94,7 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
 
             _disposed = true;
 
-            CloseConnection();
+            CloseConnectionAsync().GetAwaiter().GetResult();
         }
         finally
         {
@@ -117,9 +116,9 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
 
         try
         {
-            AccessQueue(() =>
+            await AccessQueueAsync(async () =>
             {
-                GetChannel().Model.QueueDelete(Uri.QueueName);
+                await (await GetRawChannelAsync()).Channel.QueueDeleteAsync(Uri.QueueName, cancellationToken: _cancellationToken);
             });
         }
         catch (OperationCanceledException)
@@ -148,9 +147,9 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
 
         try
         {
-            AccessQueue(() =>
+            await AccessQueueAsync(async () =>
             {
-                GetChannel().Model.QueuePurge(Uri.QueueName);
+                await (await GetRawChannelAsync()).Channel.QueuePurgeAsync(Uri.QueueName, _cancellationToken);
             });
         }
         catch (OperationCanceledException)
@@ -193,15 +192,15 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
 
         try
         {
-            return AccessQueue(() =>
+            return await AccessQueueAsync(async () =>
             {
-                var result = GetChannel().Model.BasicGet(Uri.QueueName, false);
+                var result = await (await GetRawChannelAsync()).Channel.BasicGetAsync(Uri.QueueName, false, _cancellationToken);
 
                 var empty = result == null;
 
                 if (result != null)
                 {
-                    GetChannel().Model.BasicReject(result.DeliveryTag, true);
+                    await (await GetRawChannelAsync()).Channel.BasicRejectAsync(result.DeliveryTag, true, _cancellationToken);
                 }
 
                 Operation?.Invoke(this, new("[is-empty]", empty));
@@ -240,14 +239,15 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
 
         try
         {
-            AccessQueue(() =>
+            await AccessQueueAsync(async () =>
             {
-                var model = GetChannel().Model;
+                var channel = (await GetRawChannelAsync()).Channel;
 
-                var properties = model.CreateBasicProperties();
-
-                properties.Persistent = _rabbitMQOptions.Persistent;
-                properties.CorrelationId = transportMessage.MessageId.ToString();
+                var properties = new BasicProperties
+                {
+                    Persistent = _rabbitMQOptions.Persistent,
+                    CorrelationId = transportMessage.MessageId.ToString()
+                };
 
                 if (transportMessage.HasExpiryDate())
                 {
@@ -283,7 +283,7 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
                     data = stream.ToBytesAsync().GetAwaiter().GetResult();
                 }
 
-                model.BasicPublish(string.Empty, Uri.QueueName, false, properties, data);
+                await channel.BasicPublishAsync(string.Empty, Uri.QueueName, false, properties, data, _cancellationToken);
             });
 
             MessageEnqueued?.Invoke(this, new(transportMessage, stream));
@@ -310,9 +310,9 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
 
         try
         {
-            return await Task.FromResult(AccessQueue(() =>
+            return await AccessQueueAsync(async () =>
             {
-                var result = GetChannel().Next();
+                var result = await (await GetRawChannelAsync()).NextAsync();
 
                 var receivedMessage = result == null
                     ? null
@@ -324,7 +324,7 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
                 }
 
                 return receivedMessage;
-            }));
+            });
         }
         catch (OperationCanceledException)
         {
@@ -350,7 +350,7 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
 
         try
         {
-            AccessQueue(() => GetChannel().Acknowledge((DeliveredMessage)acknowledgementToken));
+            await AccessQueueAsync(async () => await (await GetRawChannelAsync()).AcknowledgeAsync((DeliveredMessage)acknowledgementToken));
 
             MessageAcknowledged?.Invoke(this, new(acknowledgementToken));
         }
@@ -376,13 +376,14 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
 
         try
         {
-            AccessQueue(() =>
+            await AccessQueueAsync(async () =>
             {
                 var token = (DeliveredMessage)acknowledgementToken;
 
-                var channel = GetChannel();
-                channel.Model.BasicPublish(string.Empty, Uri.QueueName, false, token.BasicProperties, token.Data.AsMemory(0, token.DataLength));
-                channel.Acknowledge(token);
+                var rawChannel = await GetRawChannelAsync();
+
+                await rawChannel.Channel.BasicPublishAsync(string.Empty, Uri.QueueName, false, token.BasicProperties, token.Data.AsMemory(0, token.DataLength), _cancellationToken).ConfigureAwait(false);
+                await rawChannel.AcknowledgeAsync(token);
             });
 
             MessageReleased?.Invoke(this, new(acknowledgementToken));
@@ -397,7 +398,7 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
         }
     }
 
-    private void AccessQueue(Action action, int retry = 0)
+    private async Task AccessQueueAsync(Func<Task> action, int retry = 0)
     {
         if (_disposed || _cancellationToken.IsCancellationRequested)
         {
@@ -406,7 +407,7 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
 
         try
         {
-            action.Invoke();
+            await action.Invoke();
         }
         catch (ConnectionException)
         {
@@ -415,13 +416,13 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
                 throw;
             }
 
-            CloseConnection();
+            await CloseConnectionAsync();
 
-            AccessQueue(action, retry + 1);
+            await AccessQueueAsync(action, retry + 1);
         }
     }
 
-    private T? AccessQueue<T>(Func<T> action, int retry = 0)
+    private async Task<T?> AccessQueueAsync<T>(Func<Task<T>> action, int retry = 0)
     {
         if (_disposed)
         {
@@ -430,7 +431,7 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
 
         try
         {
-            return action.Invoke();
+            return await action.Invoke();
         }
         catch (ConnectionException)
         {
@@ -439,13 +440,13 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
                 throw;
             }
 
-            CloseConnection();
+            await CloseConnectionAsync();
 
-            return AccessQueue(action, retry + 1);
+            return await AccessQueueAsync(action, retry + 1);
         }
     }
 
-    private void CloseConnection()
+    private async Task CloseConnectionAsync()
     {
         if (_connection == null)
         {
@@ -454,7 +455,7 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
 
         if (_connection.IsOpen)
         {
-            _connection.Close(_rabbitMQOptions.ConnectionCloseTimeout);
+            await _connection.CloseAsync(_rabbitMQOptions.ConnectionCloseTimeout);
         }
 
         try
@@ -467,9 +468,9 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
         }
     }
 
-    private Channel GetChannel()
+    private async Task<RawChannel> GetRawChannelAsync()
     {
-        if (_connection != null && _channel is { Model.IsOpen: true })
+        if (_connection != null && _channel is { Channel.IsOpen: true })
         {
             return _channel;
         }
@@ -483,7 +484,7 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
         {
             try
             {
-                _connection = GetConnection();
+                _connection = await GetConnectionAsync();
             }
             catch
             {
@@ -496,18 +497,18 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
             throw new ConnectionException(string.Format(Resources.ConnectionException, Uri));
         }
 
-        var model = _connection.CreateModel();
+        var channel = await _connection.CreateChannelAsync(cancellationToken: _cancellationToken);
 
-        model.BasicQos(0, _rabbitMQOptions.PrefetchCount, false);
+        await channel.BasicQosAsync(0, _rabbitMQOptions.PrefetchCount, false, _cancellationToken);
 
-        QueueDeclare(model);
+        await QueueDeclareAsync(channel);
 
-        _channel = new(model, Uri, _rabbitMQOptions);
+        _channel = new(channel, Uri, _rabbitMQOptions);
 
         return _channel;
     }
 
-    private IConnection GetConnection()
+    private async Task<IConnection> GetConnectionAsync()
     {
         if (_connection is { IsOpen: true })
         {
@@ -521,21 +522,21 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
                 return _connection;
             }
 
-            CloseConnection();
+            await CloseConnectionAsync();
         }
 
-        return _factory.CreateConnection(Uri.QueueName);
+        return await _factory.CreateConnectionAsync(Uri.QueueName, _cancellationToken);
     }
 
-    private void QueueDeclare(IModel model)
+    private async Task QueueDeclareAsync(IChannel channel)
     {
         Operation?.Invoke(this, new("[queue-declare/starting]"));
 
-        model.QueueDeclare(Uri.QueueName, _rabbitMQOptions.Durable, false, false, _arguments);
+        await channel.QueueDeclareAsync(Uri.QueueName, _rabbitMQOptions.Durable, false, false, _arguments, cancellationToken: _cancellationToken);
 
         try
         {
-            model.QueueDeclarePassive(Uri.QueueName);
+            await channel.QueueDeclarePassiveAsync(Uri.QueueName, _cancellationToken);
 
             Operation?.Invoke(this, new("[queue-declare/]"));
         }
@@ -548,7 +549,7 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
 
 internal class DeliveredMessage
 {
-    public IBasicProperties BasicProperties { get; set; } = null!;
+    public BasicProperties BasicProperties { get; set; } = null!;
     public byte[] Data { get; set; } = null!;
 
     public int DataLength { get; set; }
