@@ -16,7 +16,7 @@
 		<copyright>Copyright (c) 2024, Eben Roux</copyright>
 		<tags>shuttle rabbitmq</tags>
 		<dependencies>
-      <dependency id="RabbitMQ.Client" version="6.8.1" />
+      <dependency id="RabbitMQ.Client" version="7.0.0" />
       <dependency id="Shuttle.Esb" version="20.0.0" />
 		</dependencies>
 	</metadata>
