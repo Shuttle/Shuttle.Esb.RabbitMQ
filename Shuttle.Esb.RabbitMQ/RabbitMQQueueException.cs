@@ -1,11 +1,10 @@
 ﻿using System;
 
-namespace Shuttle.Esb.RabbitMQ
+namespace Shuttle.Esb.RabbitMQ;
+
+public class RabbitMQQueueException : Exception
 {
-    public class RabbitMQQueueException : Exception
+    public RabbitMQQueueException(string message) : base(message)
     {
-        public RabbitMQQueueException(string message) : base(message)
-        {
-        }
     }
 }

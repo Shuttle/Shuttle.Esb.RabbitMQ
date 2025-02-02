@@ -1,33 +1,29 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Shuttle.Core.Contract;
 
-namespace Shuttle.Esb.RabbitMQ
+namespace Shuttle.Esb.RabbitMQ;
+
+public class RabbitMQBuilder
 {
-    public class RabbitMQBuilder
+    internal readonly Dictionary<string, RabbitMQOptions> RabbitMQOptions = new();
+
+    public RabbitMQBuilder(IServiceCollection services)
     {
-        internal readonly Dictionary<string, RabbitMQOptions> RabbitMQOptions = new Dictionary<string, RabbitMQOptions>();
+        Services = Guard.AgainstNull(services);
+    }
 
-        public RabbitMQBuilder(IServiceCollection services)
-        {
-            Guard.AgainstNull(services, nameof(services));
+    public IServiceCollection Services { get; }
 
-            Services = services;
-        }
+    public RabbitMQBuilder AddOptions(string name, RabbitMQOptions amazonSqsOptions)
+    {
+        Guard.AgainstNullOrEmptyString(name);
+        Guard.AgainstNull(amazonSqsOptions);
 
-        public IServiceCollection Services { get; }
+        RabbitMQOptions.Remove(name);
 
-        public RabbitMQBuilder AddOptions(string name, RabbitMQOptions amazonSqsOptions)
-        {
-            Guard.AgainstNullOrEmptyString(name, nameof(name));
-            Guard.AgainstNull(amazonSqsOptions, nameof(amazonSqsOptions));
+        RabbitMQOptions.Add(name, amazonSqsOptions);
 
-            RabbitMQOptions.Remove(name);
-
-            RabbitMQOptions.Add(name, amazonSqsOptions);
-
-            return this;
-        }
+        return this;
     }
 }
