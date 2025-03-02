@@ -251,7 +251,7 @@ public class RabbitMQQueue : IQueue, ICreateQueue, IDropQueue, IPurgeQueue, IDis
 
                 if (transportMessage.HasExpiryDate())
                 {
-                    var milliseconds = (long)(transportMessage.ExpiryDate - DateTime.Now).TotalMilliseconds;
+                    var milliseconds = (long)(transportMessage.ExpiryDate - DateTimeOffset.UtcNow).TotalMilliseconds;
 
                     if (milliseconds < 1)
                     {
