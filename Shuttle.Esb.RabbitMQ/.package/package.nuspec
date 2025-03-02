@@ -3,7 +3,7 @@
 <package>
 	<metadata>
 		<id>Shuttle.Esb.RabbitMQ</id>
-		<version>21.0.0</version>
+		<version>20.0.0</version>
 		<authors>Eben Roux</authors>
 		<owners>Eben Roux</owners>
 		<license type="expression">BSD-3-Clause</license>
@@ -16,8 +16,8 @@
 		<copyright>Copyright (c) 2025, Eben Roux</copyright>
 		<tags>shuttle rabbitmq</tags>
 		<dependencies>
-      <dependency id="RabbitMQ.Client" version="7.1.1" />
-      <dependency id="Shuttle.Esb" version="21.0.0" />
+      <dependency id="RabbitMQ.Client" version="7.0.0" />
+      <dependency id="Shuttle.Esb" version="20.0.0" />
 		</dependencies>
 	</metadata>
 	<files>
